@@ -541,7 +541,7 @@ class Action:
         files = options.files
         self._search = options.search
         if options.grep:
-            options.files.append(options.replace)
+            options.files.insert(0, options.replace)
             self._replace = options.replace = None
         else:
             self._replace = options.replace
@@ -591,7 +591,7 @@ def parse_args():
     description = 'Interactively replace python regular expressions in files'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('--version', '-V', action='version',
-                        version='%(prog)s 0.1')
+                        version='%(prog)s 0.2')
     parser.add_argument('--before', '-B', type=int, default=0,
                         help=r'add lines of context before match')
     parser.add_argument('--after', '-A', type=int, default=0,
