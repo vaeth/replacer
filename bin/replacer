@@ -46,6 +46,7 @@ class Colors:
                 None,  # at, unreplaced
                 None,  # at, replaced
                 None,  # after or grep
+                None,  # filename
             ]
         if mode == 'dark':
             self._data = [
@@ -54,6 +55,7 @@ class Colors:
                 Fore.RED + Style.BRIGHT,  # at, unreplaced
                 Fore.GREEN + Style.BRIGHT,  # at, replaced
                 Fore.YELLOW + Style.BRIGHT,  # after or grep
+                Fore.MAGENTA + Style.BRIGHT,  # filename
             ]
         elif mode == 'light':
             self._data = [
@@ -62,6 +64,7 @@ class Colors:
                 Fore.RED + Style.BRIGHT,  # at, unreplaced
                 Fore.BLUE + Style.BRIGHT,  # at, replaced
                 Fore.MAGENTA + Style.BRIGHT,  # after or grep
+                Fore.YELLOW + Style.BRIGHT,  # filename
             ]
         else:
             raise ValueError('bad color mode “{0}”'.format(mode))
@@ -118,8 +121,19 @@ class MatchList:
         self._list = []
         self._previous = 0
 
+    def empty(self):
+        return (not self._list)
+
+    def length(self):
+        return len(self._list)
+
+    def have(self):
+        return (self._index < len(self._list))
+
     def finalize(self):
         del self._previous
+        if self.empty():
+            return
         self._index = 0
         self._pos = self._list[0][0]
         self._line_number = self.text.count('\n', 0, self._pos)
@@ -134,9 +148,6 @@ class MatchList:
             entry.append(replace)
         self._previous = end
         self._list.append(entry)
-
-    def have(self):
-        return (self._index < len(self._list))
 
     def next(self, replace):
         c = self._list[self._index]
@@ -185,12 +196,19 @@ class MatchList:
                 index -= 1
         return (pos, index, in_pattern)
 
+    def colored_filename(self, append=':'):
+        if self.filename is None:
+            return ''
+        color = self.colors[5]
+        if color:
+            return (color + self.filename + self.colors.reset + append)
+        return (self.filename + append)
+
     def _write_line_number(self, line_number, mode=' '):
-        if self.filename is not None:
-            write(self.filename + ':')
         if self._grep:
             mode = ''
-        write('{0}{1}:'.format(line_number + 1, mode))
+        write('{0}{1}{2}:'.format(self.colored_filename(), line_number + 1,
+            mode))
 
     def _write_color(self, replace=None, index=None):
         if self._grep:
@@ -402,13 +420,16 @@ class MatchList:
 
 class Matcher:
     def __init__(self, search, replace=None, plain_search=False,
-                 plain_replace=False, flags=0):
+                 plain_replace=False, flags=0, quiet=False):
+        self._quick = False
         if plain_search:
             search = re.sub(r'[a-zA-Z_]', r'\\\0', search)
         self._re = re.compile(search, flags)
         if replace is None:
             self._plain_replace = True
             self._replace = None
+            if quiet:
+                self._quick = True
             return
         if plain_replace:
             self._plain_replace = True
@@ -435,6 +456,8 @@ class Matcher:
             else:   # poor man's fallback:
                 replace = match.expand(self._replace)
             match_list.add(match.start(), match.end(), replace)
+            if self._quick:
+                return match_list
         match_list.finalize()
         return match_list
 
@@ -445,7 +468,7 @@ def ask_replace():
     while True:
         answer = my_input(msg)
         if answer == 's':
-            exit(0)
+            sys.exit(0)
         if answer in ['y', 'n', 'r', 'q', 'a', 'A']:
             return answer
 
@@ -456,7 +479,7 @@ def ask_write(filename):
     while True:
         answer = my_input(msg)
         if answer == 's':
-            exit(0)
+            sys.exit(0)
         if answer in ['y', 'n', 'w']:
             return answer
 
@@ -485,20 +508,37 @@ class Action:
                 pass
 
     def _process(self, filename):
+        if self._break:
+            return
         text = self._slurp(filename)
         matcher = Matcher(
             self._search, self._replace,
             plain_search=self._plain_search,
             plain_replace=self._plain_replace,
             flags=self._flags,
+            quiet=self._quiet
         )
         match_list = matcher.get_match_list(text)
         match_list.colors = self._colors
         match_list.before = self._before
         match_list.after = self._after
         match_list.filename = filename
-        have = match_list.have()
+        have = (not match_list.empty())
         if self._replace is None:
+            if have:
+                self._have = True
+                if self._quiet:
+                    self._break = True
+                    return
+                if self._list:
+                    print(match_list.colored_filename(append=''))
+                    return
+            if self._quiet:
+                return
+            if self._count:
+                print("{0}{1}".format(match_list.colored_filename(),
+                    match_list.length()))
+                return
             while have:
                 have = match_list.output_next_grep()
             return
@@ -537,12 +577,17 @@ class Action:
         if write:
             self._write(filename, match_list.text)
 
-    def main(self, options):
+    def __init__(self, options):
+        self._have = False
+        self._break = False
         files = options.files
         self._search = options.search
-        if options.grep:
-            options.files.insert(0, options.replace)
+        if options.grep or options.count or options.list:
+            if options.replace is not None:
+                files.insert(0, options.replace)
             self._replace = options.replace = None
+            self._list = options.list
+            self._count = options.count
         else:
             self._replace = options.replace
         self._plain_search = options.plain_search
@@ -583,9 +628,13 @@ class Action:
         for filename in files:
             if os.path.isfile(filename):
                 self._process(filename)
+                if self._break:
+                    return
             else:
                 warn('not an accessible file: {0}'.format(filename))
-
+        if self._replace is None and not self._have:
+            sys.exit(1)  # grep mode with no match
+        sys.exit(0)
 
 def parse_args():
     description = 'Interactively replace python regular expressions in files'
@@ -605,7 +654,11 @@ def parse_args():
     parser.add_argument('--keep', '-k', action='store_true',
                         help=r'try to keep timestamps when modifying files')
     parser.add_argument('--grep', '-g', action='store_true',
-                        help=r'grep mode: do not replace')
+                        help=r'grep mode, only show matches')
+    parser.add_argument('--count', '-c', action='store_true',
+                        help=r'grep mode, count matches in files')
+    parser.add_argument('--list', '-l', action='store_true',
+                        help=r'grep mode, list matches in files')
     parser.add_argument('--ignorecase', '-I', action='store_true',
                         help=r'ignore case')
     parser.add_argument('--multiline', '-M', action='store_true',
@@ -618,13 +671,13 @@ def parse_args():
                         help=r'make \w \W \b \B follow locale')
     parser.add_argument('--verbose', '-X', action='store_true',
                         help=r'allow comments in pattern')
-    parser.add_argument('--colors', '-c', choices=['none', 'dark', 'light'],
+    parser.add_argument('--colors', '-H', choices=['none', 'dark', 'light'],
                         default='dark',
-                        help=r'color mode')
+                        help=r'highlight mode')
     parser.add_argument('--yes', '-y', action='count', default=0,
                         help=r'always replace (twice to always write)')
     parser.add_argument('--quiet', '-q', action='store_true',
-                        help=r'do not print matches with -y')
+                        help=r'do not print matches, quiet grep')
     parser.add_argument('search', metavar='SEARCH',
                         help=r'search pattern')
     parser.add_argument('replace', metavar='REPLACE',
@@ -635,10 +688,12 @@ def parse_args():
 
 try:
     locale.setlocale(locale.LC_ALL, '')
-    Action().main(parse_args())
+    Action(parse_args())
 except KeyboardInterrupt:
-    exit(130)
+    sys.exit(130)
+except SystemExit:
+    raise
 except Exception as e:
-    raise  # uncomment for debugging
+    # raise  # uncomment for debugging
     print("{0}: {1}".format(type(e).__name__, e))
-    exit(2)
+    sys.exit(2)

@@ -1,0 +1,14 @@
+# ChangeLog for replacer
+
+*replacer-0.2
+	Martin Väth <martin at mvath.de>:
+	- Colorize filename
+	- Fix order of files with -g
+	- Make return value in grep mode consistent with grep
+	- Make --quiet work with grep mode and shortcut
+	- New grep options --count --list
+	- Rename color option to highlight (-H) to avoid collision
+
+*replacer-0.1
+	Martin Väth <martin at mvath.de>:
+	- Initial implementation from scratch
