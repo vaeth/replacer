@@ -1,0 +1,644 @@
+#!/usr/bin/env python
+# (C) Martin V\"ath <martin@mvath.de>
+
+from __future__ import print_function
+import argparse
+import codecs
+import locale
+import re
+import os
+import sys
+
+try:
+    import sre_parse
+    have_sre_parse = True
+except ImportError:
+    have_sre_parse = False
+
+try:
+    from colorama import Fore, Style
+except ImportError:
+    class Fore:
+        BLACK = '\033[30m'
+        RED = '\033[31m'
+        GREEN = '\033[32m'
+        YELLOW = '\033[33m'
+        BLUE = '\033[34m'
+        MAGENTA = '\033[35m'
+        CYAN = '\033[36m'
+        WHITE = '\033[37m'
+
+    class Style:
+        BRIGHT = '\033[1m'
+        DIM = '\033[2m'
+        NORMAL = '\033[22m'
+        RESET_ALL = '\033[0m'
+
+
+class Colors:
+    reset = Style.RESET_ALL
+
+    def set_mode(self, mode='dark'):
+        if mode == 'none':
+            self._data = [
+                None,  # before, unreplaced
+                None,  # before, replaced
+                None,  # at, unreplaced
+                None,  # at, replaced
+                None,  # after or grep
+            ]
+        if mode == 'dark':
+            self._data = [
+                Fore.MAGENTA,  # before, unreplaced
+                Fore.BLUE + Style.BRIGHT,  # before, replaced
+                Fore.RED + Style.BRIGHT,  # at, unreplaced
+                Fore.GREEN + Style.BRIGHT,  # at, replaced
+                Fore.YELLOW + Style.BRIGHT,  # after or grep
+            ]
+        elif mode == 'light':
+            self._data = [
+                Fore.YELLOW,  # before, unreplaced
+                Fore.CYAN,  # before, replaced
+                Fore.RED + Style.BRIGHT,  # at, unreplaced
+                Fore.BLUE + Style.BRIGHT,  # at, replaced
+                Fore.MAGENTA + Style.BRIGHT,  # after or grep
+            ]
+        else:
+            raise ValueError('bad color mode “{0}”'.format(mode))
+
+    def __init__(self, mode='dark'):
+        self.set_mode(mode)
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+
+def write(*args, **kwargs):
+    print(*args, end='', **kwargs)
+
+
+def write_printable(text):
+    def to_printable(match):
+        return repr(match.group(0)).replace("'", "")
+    write(write_printable.nonprintable.sub(to_printable, text))
+write_printable.nonprintable = re.compile('[\x00-\x09\x0B-\x1F]')
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
+def warn(msg, **kwargs):
+    eprint("warning: {0}".format(msg), **kwargs)
+
+
+def my_input(msg):
+    try:
+        return raw_input(msg)
+    except NameError:
+        return input(msg)
+
+
+def linestart(text, index):
+    if index <= 0:
+        return 0
+    previous = text.rfind('\n', 0, index)
+    if previous < 0:
+        return 0
+    return previous + 1
+
+
+class MatchList:
+    def __init__(self, text, grep=False):
+        self.before = 0
+        self.after = 0
+        self.colors = Colors()
+        self.text = text
+        self._grep = grep
+        self._list = []
+        self._previous = 0
+
+    def finalize(self):
+        del self._previous
+        self._index = 0
+        self._pos = self._list[0][0]
+        self._line_number = self.text.count('\n', 0, self._pos)
+        self._line_start = linestart(self.text, self._pos)
+        self._line_printed = -1
+
+    def add(self, start, end, replace=None):
+        if self.text[start:end] == replace:
+            return
+        entry = [start - self._previous, end - start]
+        if not self._grep:
+            entry.append(replace)
+        self._previous = end
+        self._list.append(entry)
+
+    def have(self):
+        return (self._index < len(self._list))
+
+    def next(self, replace):
+        c = self._list[self._index]
+        pos = self._pos
+        if replace:
+            c = self._list[self._index]
+            sub = c[2]
+            self.text = self.text[:pos] + sub + self.text[pos + c[1]:]
+            l = c[1] = len(sub)
+            c[2] = True
+        else:
+            l = c[1]
+            c[2] = False
+        npos = pos + l
+        self._line_number += self.text.count('\n', pos, npos)
+        self._line_printed = self._line_number + self.after
+        self._index += 1
+        if not self.have():
+            return False
+        pos = npos
+        npos = pos + self._list[self._index][0]
+        self._line_number += self.text.count('\n', pos, npos)
+        self._pos = pos = npos
+        self._line_start = linestart(self.text, pos)
+        return True
+
+    def _pos_index_in_pattern(self, start):
+        index = self._index
+        in_pattern = False
+        pos = self._pos
+        while True:
+            if in_pattern:
+                npos = pos - self._list[index][1]
+                if npos < start:
+                    break
+                pos = npos
+                in_pattern = False
+            else:
+                if index == 0:
+                    break
+                npos = pos - self._list[index][0]
+                if npos < start:
+                    break
+                pos = npos
+                in_pattern = True
+                index -= 1
+        return (pos, index, in_pattern)
+
+    def _write_line_number(self, line_number, mode=' '):
+        if self.filename is not None:
+            write(self.filename + ':')
+        if self._grep:
+            mode = ''
+        write('{0}{1}:'.format(line_number + 1, mode))
+
+    def _write_color(self, replace=None, index=None):
+        if self._grep:
+            color = self.colors[4]
+        elif index is None:
+            color = self.colors[2 + replace]
+        else:
+            replace = self._list[index][2]
+            if isinstance(replace, bool):
+                color = self.colors[replace]
+            else:
+                color = self.colors[4]
+        if color:
+            write(color)
+            return self.colors.reset
+        return None
+
+    def _write_substring(self, start, end):
+        write_printable(self.text[start:end])
+
+    def _output_lines_before(self):
+        if not self.before:
+            return
+        start = self._line_start
+        line_number = self._line_number
+        starts = []
+        for i in range(self.before):
+            if start == 0 or \
+                    line_number - len(starts) - 1 <= self._line_printed:
+                break
+            start = linestart(self.text, start - 1)
+            starts.append(start)
+        if not starts:
+            return
+        line_number -= len(starts)
+        prevstart = None
+        for start in reversed(starts):
+            if prevstart:
+                self._write_line_number(line_number)
+                self._write_substring(prevstart, start)
+                line_number += 1
+            prevstart = start
+        self._write_line_number(line_number)
+        self._write_substring(prevstart, self._line_start)
+
+    def _output_to_lineend(self, current, pos, index, in_pattern):
+        newline = self.text.find("\n", current)
+        if newline < 0:
+            newline = len(self.text)
+            nextline = None
+        else:
+            newline += 1
+            nextline = newline
+        reset = None
+        toggle = False
+        while True:
+            last = (pos is None or pos >= newline)
+            if last:
+                end = newline
+            else:
+                end = pos
+            if current < end:
+                if in_pattern:
+                    reset = self._write_color(index=index)
+                elif reset:
+                    write(reset)
+                    reset = None
+                self._write_substring(current, end)
+                current = end
+            if last:
+                break
+            if in_pattern:
+                in_pattern = False
+                index += 1
+                if index >= len(self._list):
+                    pos = None
+                else:
+                    pos += self._list[index][0]
+            else:
+                in_pattern = True
+                pos += self._list[index][1]
+        if reset:
+            write(reset)
+        if nextline is None:
+            print("(no newline)")
+        elif nextline >= len(self.text):
+            nextline = None
+        return (nextline, pos, index, in_pattern)
+
+    def _output_lines_at(self, pos, index, in_pattern, replace):
+        if replace:
+            mode = '+'
+        else:
+            mode = '-'
+        line_number = self._line_number
+        current = self._line_start
+        self._write_line_number(line_number, mode=mode)
+        reset = None
+        if current < pos:
+            if in_pattern:
+                reset = self._wrote_color(index=index)
+                in_pattern = False
+            else:
+                in_pattern = True
+            self._write_substring(current, pos)
+        while index < self._index:
+            if in_pattern:
+                reset = self._write_color(index=index)
+                npos = pos + self._list[index][1]
+                in_pattern = False
+            else:
+                if reset:
+                    write(reset)
+                    reset = None
+                index += 1
+                npos = pos + self._list[index][0]
+                in_pattern = True
+            self._write_substring(pos, npos)
+            pos = npos
+        current = pos
+        pos += self._list[index][1]
+        if replace:
+            output = self._list[index][2]
+        else:
+            output = self.text[current:pos]
+        output_current = 0
+        newline = -1
+        while output_current < len(output):
+            if line_number > self._line_number:
+                self._write_line_number(line_number, mode=mode)
+            reset = self._write_color(replace=replace)
+            newline = output.find('\n', output_current)
+            if newline < 0:
+                write(output[output_current:])
+                if reset:
+                    write(reset)
+                break
+            newline += 1
+            write(output[output_current:newline])
+            if reset:
+                write(reset)
+            output_current = newline
+            line_number += 1
+        current = pos
+        index += 1
+        if index < len(self._list):
+            pos += self._list[index][0]
+        else:
+            pos = None
+        if newline < 0:  # match does not close with newline
+            (current, pos, index, in_pattern) = \
+                self._output_to_lineend(current, pos, index, False)
+        return (line_number + 1, current, pos, index, in_pattern)
+
+    def _output_lines_after(self, startline, current, pos, index,
+                            in_pattern):
+        if not self.after:
+            return
+        for line_number in range(startline, startline + self.after):
+            if current is None:
+                break
+            self._write_line_number(line_number)
+            (current, pos, index, in_pattern) = \
+                self._output_to_lineend(current, pos, index, in_pattern)
+
+    def _output_lines_nogrep(self):
+        self._output_lines_before()
+        (pos, index, in_pattern) = self._pos_index_in_pattern(self._line_start)
+        self._output_lines_at(pos, index, in_pattern, False)
+        (startline, current, pos, index, in_pattern) = \
+            self._output_lines_at(pos, index, in_pattern, True)
+        self._output_lines_after(startline, current, pos, index, in_pattern)
+
+    def _output_next_lines_grep(self):
+        self._output_lines_before()
+        current = self._line_start
+        (pos, index, in_pattern) = self._pos_index_in_pattern(current)
+        line_number = self._line_number
+        lines_to_print = self.after + 1
+        while lines_to_print > 0:
+            self._write_line_number(line_number)
+            (current, npos, index, in_pattern) = \
+                self._output_to_lineend(current, pos, index, in_pattern)
+            if current is None:
+                return False
+            line_number += 1
+            if in_pattern:
+                lines_to_print = self.after + 1
+            elif pos is not None and (npos is None or npos != pos):
+                lines_to_print = self.after
+            else:
+                lines_to_print -= 1
+            pos = npos
+        if pos is None:
+            return False
+        self._line_printed = line_number - 1
+        self._line_number = line_number + self.text.count("\n", current, pos)
+        self._index = index
+        self._pos = pos
+        self._line_start = linestart(self.text, pos)
+        return True
+
+    def output_nogrep(self):
+        self._output_lines_nogrep()
+
+    def output_next_grep(self):
+        return self._output_next_lines_grep()
+
+
+class Matcher:
+    def __init__(self, search, replace=None, plain_search=False,
+                 plain_replace=False, flags=0):
+        if plain_search:
+            search = re.sub(r'[a-zA-Z_]', r'\\\0', search)
+        self._re = re.compile(search, flags)
+        if replace is None:
+            self._plain_replace = True
+            self._replace = None
+            return
+        if plain_replace:
+            self._plain_replace = True
+            self._replace = replace
+        elif have_sre_parse:  # cf _subx() in re.py for the undocumented usage:
+            template = sre_parse.parse_template(replace, self._re)
+            if not template[0] and len(template[1]) == 1:
+                self._plain_replace = True
+                self._replace = template[1][0]
+            else:
+                self._plain_replace = False
+                self._replace = template
+        else:  # poor man's fallback
+            self._plain_replace = False
+            self._replace = replace
+
+    def get_match_list(self, text):
+        match_list = MatchList(text, grep=(self._replace is None))
+        for match in self._re.finditer(text):
+            if self._plain_replace:
+                replace = self._replace
+            elif have_sre_parse:
+                replace = sre_parse.expand_template(self._replace, match)
+            else:   # poor man's fallback:
+                replace = match.expand(self._replace)
+            match_list.add(match.start(), match.end(), replace)
+        match_list.finalize()
+        return match_list
+
+
+def ask_replace():
+    msg = 'y(es)/n(o)/r(est of file)/q(uit this file)/a(lways)' \
+          '/A(lways quiet)/s(top all) '
+    while True:
+        answer = my_input(msg)
+        if answer == 's':
+            exit(0)
+        if answer in ['y', 'n', 'r', 'q', 'a', 'A']:
+            return answer
+
+
+def ask_write(filename):
+    msg = 'write changes to {0}? y(es)/n(o)/w(rite always)/s(top all) '. \
+        format(filename)
+    while True:
+        answer = my_input(msg)
+        if answer == 's':
+            exit(0)
+        if answer in ['y', 'n', 'w']:
+            return answer
+
+
+class Action:
+    def _slurp(self, filename):
+        file = codecs.open(filename, 'rb', encoding=self._encoding)
+        text = file.read()
+        file.close()
+        return text
+
+    def _write(self, filename, text):
+        stat = None
+        if self._keep:
+            try:
+                stat = os.stat(filename)
+            except:
+                stat = None
+        file = codecs.open(filename, 'wb', encoding=self._encoding)
+        file.write(text)
+        file.close()
+        if stat is not None:
+            try:
+                os.utime(filename, (stat.st_atime, stat.st_mtime))
+            except:
+                pass
+
+    def _process(self, filename):
+        text = self._slurp(filename)
+        matcher = Matcher(
+            self._search, self._replace,
+            plain_search=self._plain_search,
+            plain_replace=self._plain_replace,
+            flags=self._flags,
+        )
+        match_list = matcher.get_match_list(text)
+        match_list.colors = self._colors
+        match_list.before = self._before
+        match_list.after = self._after
+        match_list.filename = filename
+        have = match_list.have()
+        if self._replace is None:
+            while have:
+                have = match_list.output_next_grep()
+            return
+        rest = self._always_replace
+        changed = False
+        while have:
+            if not self._quiet:
+                match_list.output_nogrep()
+            replace = False
+            if rest:
+                replace = True
+            else:
+                answer = ask_replace()
+                if answer == 'y':
+                    replace = True
+                elif answer == 'r':
+                    replace = rest = True
+                elif answer == 'a':
+                    replace = rest = self._always_replace = True
+                elif answer == 'A':
+                    replace = rest = self._always_replace = self._quiet = True
+                elif answer == 'q':
+                    break
+            if replace:
+                changed = True
+            have = match_list.next(replace)
+        if not changed:
+            return
+        write = self._always_write
+        if not write:
+            answer = ask_write(filename)
+            if answer == 'y':
+                write = True
+            elif answer == 'w':
+                write = self._always_write = True
+        if write:
+            self._write(filename, match_list.text)
+
+    def main(self, options):
+        files = options.files
+        self._search = options.search
+        if options.grep:
+            options.files.append(options.replace)
+            self._replace = options.replace = None
+        else:
+            self._replace = options.replace
+        self._plain_search = options.plain_search
+        self._plain_replace = options.plain_replace
+        self._colors = Colors(options.colors)
+        self._before = options.before
+        if self._before < 0:
+            msg = "--before {0} is negative".format(self._before)
+            raise argparse.ArgumentTypeError(msg)
+        self._after = options.after
+        if self._after < 0:
+            msg = "--after {0} is negative".format(self._after)
+            raise argparse.ArgumentTypeError(msg)
+        self._flags = 0
+        if options.ignorecase:
+            self._flags |= re.IGNORECASE
+        if options.multiline:
+            self._flags |= re.MULTILINE
+        if options.dotall:
+            self._flags |= re.DOTALL
+        if options.unicode:
+            self._flags |= re.UNICODE
+        if options.locale:
+            self._flags |= re.LOCALE
+        if options.verbose:
+            self._flags |= re.VERBOSE
+        self._encoding = options.encoding
+        self._keep = options.keep
+        self._quiet = options.quiet
+        if options.yes:
+            self._always_replace = True
+        else:
+            self._always_replace = False
+        if options.yes > 1:
+            self._always_write = True
+        else:
+            self._always_write = False
+        for filename in files:
+            if os.path.isfile(filename):
+                self._process(filename)
+            else:
+                warn('not an accessible file: {0}'.format(filename))
+
+
+def parse_args():
+    description = 'Interactively replace python regular expressions in files'
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--version', '-V', action='version',
+                        version='%(prog)s 0.1')
+    parser.add_argument('--before', '-B', type=int, default=0,
+                        help=r'add lines of context before match')
+    parser.add_argument('--after', '-A', type=int, default=0,
+                        help=r'add lines of context after match')
+    parser.add_argument('--plain-search', '-p', action='store_true',
+                        help=r'treat search pattern as plain string')
+    parser.add_argument('--plain-replace', '-P', action='store_true',
+                        help=r'treat replace pattern as plain string')
+    parser.add_argument('--encoding', '-e', default='utf8',
+                        help=r'file encoding, e.g. cp850')
+    parser.add_argument('--keep', '-k', action='store_true',
+                        help=r'try to keep timestamps when modifying files')
+    parser.add_argument('--grep', '-g', action='store_true',
+                        help=r'grep mode: do not replace')
+    parser.add_argument('--ignorecase', '-I', action='store_true',
+                        help=r'ignore case')
+    parser.add_argument('--multiline', '-M', action='store_true',
+                        help=r'make ^/$ consider each line')
+    parser.add_argument('--dotall', '-S', action='store_true',
+                        help=r'make . match newline, too')
+    parser.add_argument('--unicode', '-U', action='store_true',
+                        help=r'make \w \W \b \B follow unicode rules')
+    parser.add_argument('--locale', '-L', action='store_true',
+                        help=r'make \w \W \b \B follow locale')
+    parser.add_argument('--verbose', '-X', action='store_true',
+                        help=r'allow comments in pattern')
+    parser.add_argument('--colors', '-c', choices=['none', 'dark', 'light'],
+                        default='dark',
+                        help=r'color mode')
+    parser.add_argument('--yes', '-y', action='count', default=0,
+                        help=r'always replace (twice to always write)')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                        help=r'do not print matches with -y')
+    parser.add_argument('search', metavar='SEARCH',
+                        help=r'search pattern')
+    parser.add_argument('replace', metavar='REPLACE',
+                        help=r'replace pattern')
+    parser.add_argument('files', metavar='FILE', nargs='*',
+                        help=r'files to process')
+    return parser.parse_args()
+
+try:
+    locale.setlocale(locale.LC_ALL, '')
+    Action().main(parse_args())
+except KeyboardInterrupt:
+    exit(130)
+except Exception as e:
+    raise  # uncomment for debugging
+    print("{0}: {1}".format(type(e).__name__, e))
+    exit(2)

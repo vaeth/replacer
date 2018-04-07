@@ -1,0 +1,23 @@
+#compdef replacer
+_arguments -s -S : \
+'(1 2 * -)'{'--help','-h'}'[print help]' \
+'(1 2 * -)'{'--version','-V'}'[print version]' \
+{'(--before)-B+','(-B)--before='}'[print specified lines before match]:number of lines before match:(2)' \
+{'(--after)-A+','(-A)--after='}'[print specified lines after match]:number of lines after match:(2)' \
+{'(--plain-search)-p','(-p)--plain-search'}'[use plain string for search]' \
+{'(--plain-replace)-P','(-P)--plain-replace'}'[use plain string for replace]' \
+{'(--encoding)-e+','(-e)--encoding='}'[use specified file encoding]:file encoding:(utf8 cp850)' \
+{'(--keep)-k','(-k)--keep'}'[try to keep timestamps]' \
+'(2 '{'--grep)-g','-g)--grep'}'[grep mode]' \
+{'(--ignore-case)-i','(-i)--ignore-case'}'[ignore case]' \
+{'(--multiline)-M','(-M)--multiline'}'[make \^/\$ consider each line]' \
+{'(--dotall)-S','(-S)--dotall'}'[make . match newline, too]' \
+{'(--unicode)-U','(-U)--unicode'}'[make \\w \\W \\b \\B follow unicode]' \
+{'(--locale)-L','(-K)--locale'}'[make \\w \\W \\b \\B follow locale]' \
+{'(--verbose)-X','(-X)--verbose'}'[allow comments in pattern]' \
+{'(--colors)-c+','(-c)--colors='}'[specify color mode]:color mode:(none dark light)' \
+{'(--yes)-y','(-y)--yes'}'[always replace (twice to always write)]' \
+{'(--quiet)-q','(-q)--quiet'}'[do not print matches with -y]' \
+'1:search:()' \
+'2:replace:()' \
+'*:files:_files'
