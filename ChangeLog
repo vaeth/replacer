@@ -1,5 +1,15 @@
 # ChangeLog for replacer
 
+*replacer-1.0
+	Martin Väth <martin at mvath.de>:
+	- Provide --recursive and --skip options
+	- Fix exit code with -gq
+	- Error out if no argument is provided
+	- More verbose description
+	- Improve completion defaults
+	- Display short options in usage line of help text
+	- Add --debug option
+
 *replacer-0.2
 	Martin Väth <martin at mvath.de>:
 	- Colorize filename

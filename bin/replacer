@@ -4,9 +4,10 @@
 from __future__ import print_function
 import argparse
 import codecs
+import fnmatch
 import locale
-import re
 import os
+import re
 import sys
 
 try:
@@ -76,14 +77,77 @@ class Colors:
         return self._data[key]
 
 
+def get_parser():
+    d = r'Interactively replace python regular expressions in files. ' \
+        r'The specified SEARCH and REPLACE expressions are a regular ' \
+        r'expression and replace string following the python syntax, ' \
+        r'see e.g. https://docs.python.org/3/library/re.html or ' \
+        r'https://docs.python.org/2/library/re.html (exact features ' \
+        r'depending on your python interpreter). ' \
+        r'For the replace string, see in particular the description of ' \
+        r'the sub() function. In the terminology of the web pages, ' \
+        r'the arguments (as passed by the shell) are treated as ' \
+        r'“raw” strings.'
+    p = argparse.ArgumentParser(description=d)
+    a = p.add_argument
+    a('-V', '--version', action='version', version='%(prog)s 1.0')
+    a('-B', '--before', type=int, default=0,
+      help=r'add lines of context before match')
+    a('-A', '--after', type=int, default=0,
+      help=r'add lines of context after match')
+    a('-p', '--plain-search', action='store_true',
+      help=r'treat search expression as plain string')
+    a('-P', '--plain-replace', action='store_true',
+      help=r'treat replace expression as plain string')
+    a('-e', '--encoding', default='utf8',
+      help=r'file encoding, e.g. cp850')
+    a('-k', '--keep', action='store_true',
+      help=r'try to keep timestamps when modifying files')
+    a('-g', '--grep', action='store_true',
+      help=r'grep mode, only show matches')
+    a('-c', '--count', action='store_true',
+      help=r'grep mode, count matches in files')
+    a('-l', '--list', action='store_true',
+      help=r'grep mode, list matches in files')
+    a('-I', '--ignorecase', action='store_true',
+      help=r'ignore case in search expression')
+    a('-M', '--multiline', action='store_true',
+      help=r'make ^ and $ in search expression consider each line')
+    a('-S', '--dotall', action='store_true',
+      help=r'make . in search expression match newline, too')
+    a('-U', '--unicode', action='store_true',
+      help=r'make \w \W \b \B in search expression follow unicode rules')
+    a('-L', '--locale', action='store_true',
+      help=r'make \w \W \b \B in search expression follow locale')
+    a('-X', '--verbose', action='store_true',
+      help=r'allow comments in search expression')
+    a('-r', '--recursive', action='store_true',
+      help=r'recurse if FILE is a directory. When recursing, non-files and '
+      r'symbolic links to directories are tacitly ignored.')
+    a('-s', '--skip', action='append', default=[],
+      help=r'skip files/dirs whose paths match the specified unix pattern. '
+      r'This option is accumulative')
+    a('-H', '--colors', choices=['none', 'dark', 'light'], default='dark',
+      help=r'highlight mode')
+    a('-y', '--yes', action='count', default=0,
+      help=r'always replace (twice to always write)')
+    a('-q', '--quiet', action='store_true',
+      help=r'do not print matches, quiet grep')
+    a('-D', '--debug', action='store_true')
+    a('search', metavar='SEARCH', help=r'search expression')
+    a('replace', metavar='REPLACE', help=r'replace string')
+    a('files', metavar='FILE', nargs='*', help=r'files to process')
+    return p
+
+
 def write(*args, **kwargs):
     print(*args, end='', **kwargs)
 
 
+
 def write_printable(text):
-    def to_printable(match):
-        return repr(match.group(0)).replace("'", "")
-    write(write_printable.nonprintable.sub(to_printable, text))
+    write(write_printable.nonprintable.sub(
+        (lambda match: repr(match.group(0)).replace("'", '')), text))
 write_printable.nonprintable = re.compile('[\x00-\x09\x0B-\x1F]')
 
 
@@ -92,7 +156,7 @@ def eprint(*args, **kwargs):
 
 
 def warn(msg, **kwargs):
-    eprint("warning: {0}".format(msg), **kwargs)
+    eprint('warning: {0}'.format(msg), **kwargs)
 
 
 def my_input(msg):
@@ -208,7 +272,7 @@ class MatchList:
         if self._grep:
             mode = ''
         write('{0}{1}{2}:'.format(self.colored_filename(), line_number + 1,
-            mode))
+                                  mode))
 
     def _write_color(self, replace=None, index=None):
         if self._grep:
@@ -255,7 +319,7 @@ class MatchList:
         self._write_substring(prevstart, self._line_start)
 
     def _output_to_lineend(self, current, pos, index, in_pattern):
-        newline = self.text.find("\n", current)
+        newline = self.text.find('\n', current)
         if newline < 0:
             newline = len(self.text)
             nextline = None
@@ -293,7 +357,7 @@ class MatchList:
         if reset:
             write(reset)
         if nextline is None:
-            print("(no newline)")
+            print('<EOF>')
         elif nextline >= len(self.text):
             nextline = None
         return (nextline, pos, index, in_pattern)
@@ -405,7 +469,7 @@ class MatchList:
         if pos is None:
             return False
         self._line_printed = line_number - 1
-        self._line_number = line_number + self.text.count("\n", current, pos)
+        self._line_number = line_number + self.text.count('\n', current, pos)
         self._index = index
         self._pos = pos
         self._line_start = linestart(self.text, pos)
@@ -507,9 +571,12 @@ class Action:
             except:
                 pass
 
+    def _exit(self):
+        if self._replace is None and not self._have:
+            sys.exit(1)  # grep mode with no match
+        sys.exit(0)
+
     def _process(self, filename):
-        if self._break:
-            return
         text = self._slurp(filename)
         matcher = Matcher(
             self._search, self._replace,
@@ -528,16 +595,15 @@ class Action:
             if have:
                 self._have = True
                 if self._quiet:
-                    self._break = True
-                    return
+                    self._exit()
                 if self._list:
                     print(match_list.colored_filename(append=''))
                     return
             if self._quiet:
                 return
             if self._count:
-                print("{0}{1}".format(match_list.colored_filename(),
-                    match_list.length()))
+                print('{0}{1}'.format(match_list.colored_filename(),
+                                      match_list.length()))
                 return
             while have:
                 have = match_list.output_next_grep()
@@ -577,9 +643,29 @@ class Action:
         if write:
             self._write(filename, match_list.text)
 
-    def __init__(self, options):
-        self._have = False
-        self._break = False
+    def _test_skip(self, filename):
+        for skip in self._skip:
+            if fnmatch.fnmatch(filename, skip):
+                return True
+        return False
+
+    def _recurse(self, dir):
+        for (dirpath, dirnames, filenames) in os.walk(dir):
+            dirnames[:] = [name for name in sorted(dirnames)
+                if not self._test_skip(os.path.join(dirpath, name))]
+            for name in sorted(filenames):
+                filename = os.path.join(dirpath, name)
+                if not self._test_skip(filename) and os.path.isfile(filename):
+                    self._process(filename)
+
+    def _parse_error(self, msg):
+        self._parser.print_usage(file=sys.stderr)
+        raise argparse.ArgumentTypeError(msg)
+
+    def _main(self):
+        self._parser = get_parser()
+        options = self._parser.parse_args()
+        self._debug = options.debug
         files = options.files
         self._search = options.search
         if options.grep or options.count or options.list:
@@ -590,17 +676,19 @@ class Action:
             self._count = options.count
         else:
             self._replace = options.replace
+        if not files:
+            self._parse_error('no files specified')
         self._plain_search = options.plain_search
         self._plain_replace = options.plain_replace
         self._colors = Colors(options.colors)
         self._before = options.before
         if self._before < 0:
-            msg = "--before {0} is negative".format(self._before)
-            raise argparse.ArgumentTypeError(msg)
+            self._parse_error(
+                '--before argument {0} is negative'.format(self._before))
         self._after = options.after
         if self._after < 0:
-            msg = "--after {0} is negative".format(self._after)
-            raise argparse.ArgumentTypeError(msg)
+            self._parse_error(
+                '--after argument {0} is negative'.format(self._after))
         self._flags = 0
         if options.ignorecase:
             self._flags |= re.IGNORECASE
@@ -617,6 +705,7 @@ class Action:
         self._encoding = options.encoding
         self._keep = options.keep
         self._quiet = options.quiet
+        self._skip = options.skip
         if options.yes:
             self._always_replace = True
         else:
@@ -626,74 +715,32 @@ class Action:
         else:
             self._always_write = False
         for filename in files:
+            if self._test_skip(filename):
+                continue
             if os.path.isfile(filename):
                 self._process(filename)
-                if self._break:
-                    return
+            elif os.path.isdir(filename):
+                if options.recursive:
+                    self._recurse(filename)
+                else:
+                    warn('forgotten --recursive: directory: {0}'.
+                         format(filename))
             else:
                 warn('not an accessible file: {0}'.format(filename))
-        if self._replace is None and not self._have:
-            sys.exit(1)  # grep mode with no match
-        sys.exit(0)
 
-def parse_args():
-    description = 'Interactively replace python regular expressions in files'
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('--version', '-V', action='version',
-                        version='%(prog)s 0.2')
-    parser.add_argument('--before', '-B', type=int, default=0,
-                        help=r'add lines of context before match')
-    parser.add_argument('--after', '-A', type=int, default=0,
-                        help=r'add lines of context after match')
-    parser.add_argument('--plain-search', '-p', action='store_true',
-                        help=r'treat search pattern as plain string')
-    parser.add_argument('--plain-replace', '-P', action='store_true',
-                        help=r'treat replace pattern as plain string')
-    parser.add_argument('--encoding', '-e', default='utf8',
-                        help=r'file encoding, e.g. cp850')
-    parser.add_argument('--keep', '-k', action='store_true',
-                        help=r'try to keep timestamps when modifying files')
-    parser.add_argument('--grep', '-g', action='store_true',
-                        help=r'grep mode, only show matches')
-    parser.add_argument('--count', '-c', action='store_true',
-                        help=r'grep mode, count matches in files')
-    parser.add_argument('--list', '-l', action='store_true',
-                        help=r'grep mode, list matches in files')
-    parser.add_argument('--ignorecase', '-I', action='store_true',
-                        help=r'ignore case')
-    parser.add_argument('--multiline', '-M', action='store_true',
-                        help=r'make ^/$ consider each line')
-    parser.add_argument('--dotall', '-S', action='store_true',
-                        help=r'make . match newline, too')
-    parser.add_argument('--unicode', '-U', action='store_true',
-                        help=r'make \w \W \b \B follow unicode rules')
-    parser.add_argument('--locale', '-L', action='store_true',
-                        help=r'make \w \W \b \B follow locale')
-    parser.add_argument('--verbose', '-X', action='store_true',
-                        help=r'allow comments in pattern')
-    parser.add_argument('--colors', '-H', choices=['none', 'dark', 'light'],
-                        default='dark',
-                        help=r'highlight mode')
-    parser.add_argument('--yes', '-y', action='count', default=0,
-                        help=r'always replace (twice to always write)')
-    parser.add_argument('--quiet', '-q', action='store_true',
-                        help=r'do not print matches, quiet grep')
-    parser.add_argument('search', metavar='SEARCH',
-                        help=r'search pattern')
-    parser.add_argument('replace', metavar='REPLACE',
-                        help=r'replace pattern')
-    parser.add_argument('files', metavar='FILE', nargs='*',
-                        help=r'files to process')
-    return parser.parse_args()
+    def __init__(self):
+        self._debug = False
+        try:
+            locale.setlocale(locale.LC_ALL, '')
+            self._main()
+        except KeyboardInterrupt:
+            sys.exit(130)
+        except SystemExit:
+            raise
+        except Exception as e:
+            if self._debug:
+                raise
+            eprint('{0}: {1}'.format(type(e).__name__, e))
+            sys.exit(2)
 
-try:
-    locale.setlocale(locale.LC_ALL, '')
-    Action(parse_args())
-except KeyboardInterrupt:
-    sys.exit(130)
-except SystemExit:
-    raise
-except Exception as e:
-    # raise  # uncomment for debugging
-    print("{0}: {1}".format(type(e).__name__, e))
-    sys.exit(2)
+Action()
