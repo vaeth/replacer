@@ -1,5 +1,11 @@
 # ChangeLog for replacer
 
+*replacer-1.1
+	Martin Väth <martin at mvath.de>:
+	- Provide --encoding-fallback
+	- Warn (instead of aborting) for IO and file encoding errors
+	- Fix indentation for PEP8 E128
+
 *replacer-1.0
 	Martin Väth <martin at mvath.de>:
 	- Provide --recursive and --skip options

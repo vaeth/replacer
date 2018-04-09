@@ -90,7 +90,7 @@ def get_parser():
         r'“raw” strings.'
     p = argparse.ArgumentParser(description=d)
     a = p.add_argument
-    a('-V', '--version', action='version', version='%(prog)s 1.0')
+    a('-V', '--version', action='version', version='%(prog)s 1.1')
     a('-B', '--before', type=int, default=0,
       help=r'add lines of context before match')
     a('-A', '--after', type=int, default=0,
@@ -100,7 +100,10 @@ def get_parser():
     a('-P', '--plain-replace', action='store_true',
       help=r'treat replace expression as plain string')
     a('-e', '--encoding', default='utf8',
-      help=r'file encoding, e.g. cp850')
+      help=r'file encoding, e.g. utf8 (default), cp1252, or cp850')
+    a('-E', '--encoding-fallback', default='cp1252',
+      help=r'file encoding if the -e encoding fails, e.g. cp1252 (default) '
+      r'or cp850. Use the empty string or the value of -e to avoid retrying.')
     a('-k', '--keep', action='store_true',
       help=r'try to keep timestamps when modifying files')
     a('-g', '--grep', action='store_true',
@@ -142,7 +145,6 @@ def get_parser():
 
 def write(*args, **kwargs):
     print(*args, end='', **kwargs)
-
 
 
 def write_printable(text):
@@ -548,11 +550,50 @@ def ask_write(filename):
             return answer
 
 
-class Action:
-    def _slurp(self, filename):
-        file = codecs.open(filename, 'rb', encoding=self._encoding)
-        text = file.read()
+def close_noexcept(file):
+    try:
         file.close()
+    except Exception:
+        pass
+
+
+class Action:
+    def _slurp(self, filename, encoding_override=None):
+        self._encoding_override = encoding_override  # Remember for writing
+        if encoding_override:
+            encoding = encoding_override
+        else:
+            encoding = self._encoding
+        try:
+            file = codecs.open(filename, 'rb', encoding=encoding)
+        except Exception as e:
+            warn('cannot open {0} for reading: {1}'.format(filename, e))
+            return None
+        try:
+            text = file.read()
+        except UnicodeDecodeError as e:
+            if encoding_override:
+                warn('fallback encoding fails, too: {0}'.format(e))
+                return None
+            close_noexcept(file)
+            if self._encoding_fallback and self._encoding_fallback != encoding:
+                warn('switching encoding {0}->{1} for {2}: {3}'.
+                     format(self._encoding, self._encoding_fallback,
+                            filename, e))
+                return self._slurp(filename, self._encoding_fallback)
+            warn('{0} encoding error for {1}: {2}'.
+                 format(self._encoding, filename, e))
+            return None
+        except Exception as e:
+            close_noexcept(file)
+            warn('error when reading {0}: {1}'.format(filename, e))
+            return None
+        try:
+            file.close()
+        except Exception as e:
+            warn('error when closing {0} after reading: {1}'.
+                 format(filename, e))
+            return None
         return text
 
     def _write(self, filename, text):
@@ -560,16 +601,31 @@ class Action:
         if self._keep:
             try:
                 stat = os.stat(filename)
-            except:
+            except Exception as e:
                 stat = None
-        file = codecs.open(filename, 'wb', encoding=self._encoding)
-        file.write(text)
-        file.close()
+                warn('cannot get timestamp of {0}: {1}'.format(filename, e))
+        if self._write_encoding_override:
+            encoding = self._encoding_override
+        else:
+            encoding = self._encoding
+        try:
+            file = codecs.open(filename, 'wb', encoding=encoding)
+        except Exception as e:
+            warn('cannot open {0} for writing: {1}'.format(filename, e))
+            return
+        try:
+            file.write(text)
+        except Exception as e:
+            warn('write error to {0}: {1}'.format(filename, e))
+        try:
+            file.close()
+        except Exception as e:
+            warn('cannot close {0} after writing: {1}'.format(filename, e))
         if stat is not None:
             try:
                 os.utime(filename, (stat.st_atime, stat.st_mtime))
-            except:
-                pass
+            except Exception as e:
+                warn('cannot set timestamp of {0}: {1}'.format(filename, e))
 
     def _exit(self):
         if self._replace is None and not self._have:
@@ -578,6 +634,8 @@ class Action:
 
     def _process(self, filename):
         text = self._slurp(filename)
+        if text is None:
+            return
         matcher = Matcher(
             self._search, self._replace,
             plain_search=self._plain_search,
@@ -651,8 +709,9 @@ class Action:
 
     def _recurse(self, dir):
         for (dirpath, dirnames, filenames) in os.walk(dir):
-            dirnames[:] = [name for name in sorted(dirnames)
-                if not self._test_skip(os.path.join(dirpath, name))]
+            dirnames[:] = \
+                [name for name in sorted(dirnames)
+                 if not self._test_skip(os.path.join(dirpath, name))]
             for name in sorted(filenames):
                 filename = os.path.join(dirpath, name)
                 if not self._test_skip(filename) and os.path.isfile(filename):
@@ -703,6 +762,7 @@ class Action:
         if options.verbose:
             self._flags |= re.VERBOSE
         self._encoding = options.encoding
+        self._encoding_fallback = options.encoding_fallback
         self._keep = options.keep
         self._quiet = options.quiet
         self._skip = options.skip
