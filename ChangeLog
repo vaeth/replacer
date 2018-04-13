@@ -1,5 +1,9 @@
 # ChangeLog for replacer
 
+*replacer-1.2
+	Martin Väth <martin at mvath.de>:
+	- Fix typo which had broken writing of files (regression from 1.1)
+
 *replacer-1.1
 	Martin Väth <martin at mvath.de>:
 	- Provide --encoding-fallback
