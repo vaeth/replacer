@@ -1,5 +1,12 @@
 # ChangeLog for replacer
 
+*replacer-2.0
+	Martin Väth <martin at mvath.de>:
+	- Provide --chars option
+	- Add --context convenience option
+	- Fix output of non-printable symbols in replacement text
+	- Fix pattern compilation (compile only once, not once per file).
+
 *replacer-1.2
 	Martin Väth <martin at mvath.de>:
 	- Fix typo which had broken writing of files (regression from 1.1)

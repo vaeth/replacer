@@ -2,8 +2,10 @@
 _arguments -s -S : \
 '(1 2 * -)'{'--help','-h'}'[print help]' \
 '(1 2 * -)'{'--version','-V'}'[print version]' \
-{'(--before)-B+','(-B)--before='}'[print specified lines before match]:number of lines before match:(2)' \
-{'(--after)-A+','(-A)--after='}'[print specified lines after match]:number of lines after match:(2)' \
+{'(--chars)-b','(-b)--chars'}'[chars (binary) mode]' \
+'(--context -C '{'--before)-B+','-B)--before='}'[print specified number of lines before match]:number of lines before match:(2)' \
+'(--context -C '{'--after)-A+','-A)--after='}'[print specified number of lines after match]:number of lines after match:(2)' \
+'(--before -B --after -A '{'--context)-C+','-C)--context='}'[print specified number of context lines]:number of context lines:(2)' \
 {'(--plain-search)-p','(-p)--plain-search'}'[use plain string for search]' \
 {'(--plain-replace)-P','(-P)--plain-replace'}'[use plain string for replace]' \
 {'(--encoding)-e+','(-e)--encoding='}'[use specified file encoding (utf8)]:file encoding:(cp850 cp1252)' \
