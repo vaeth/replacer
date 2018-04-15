@@ -2,6 +2,7 @@
 
 *replacer-2.0
 	Martin Väth <martin at mvath.de>:
+	- Support (and default to) -e binary
 	- Provide --chars option
 	- Add --context convenience option
 	- Fix output of non-printable symbols in replacement text

@@ -1,10 +1,11 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # (C) Martin V\"ath <martin@mvath.de>
 
 from __future__ import print_function
 import argparse
-import codecs
 import fnmatch
+import io
 import locale
 import os
 import re
@@ -68,7 +69,7 @@ class Colors:
                 Fore.YELLOW + Style.BRIGHT,  # filename
             ]
         else:
-            raise ValueError('bad color mode “{0}”'.format(mode))
+            raise ValueError('bad color mode "{0}”'.format(mode))
 
     def __init__(self, mode='dark'):
         self.set_mode(mode)
@@ -87,16 +88,15 @@ def get_parser():
          r'For the replace string, see in particular the description of '
          r'the sub() function. In the terminology of the web pages, '
          r'the arguments (as passed by the shell) are treated as '
-         r'“raw” strings.')
+         r'"raw” strings.')
     p = argparse.ArgumentParser(description=d)
     a = p.add_argument
-    a('-V', '--version', action='version', version='%(prog)s 1.2')
+    a('-V', '--version', action='version', version='%(prog)s 2.0')
     a('-b', '--chars', action='store_true',
       help=r'chars (binary) mode: Treat chars instead of lines as units '
       r'when formatting visual output. Thus, --before and --after and '
       r'printed numbers refer to character numbers instead of line numbers. '
-      r'Newline characters are output visually as “\n”. '
-      r'For binary files, this option is often combined with -e cp850')
+      r'Newline characters are output visually as "\n”.')
     a('-B', '--before', type=int, default=None,
       help=r'add lines of context before match')
     a('-A', '--after', type=int, default=None,
@@ -107,11 +107,14 @@ def get_parser():
       help=r'treat search expression as plain string')
     a('-P', '--plain-replace', action='store_true',
       help=r'treat replace expression as plain string')
-    a('-e', '--encoding', default='utf8',
-      help=r'file encoding, e.g. utf8 (default), cp1252, or cp850')
-    a('-E', '--encoding-fallback', default='cp1252',
-      help=r'file encoding if the -e encoding fails, e.g. cp1252 (default) '
-      r'or cp850. Use the empty string or the value of -e to avoid retrying.')
+    a('-e', '--encoding', default=None,
+      help=r'file encoding, e.g. utf-8, cp1252, cp850, latin-1, see '
+      r'https://docs.python.org/3/library/codecs.html#standard-encodings '
+      r'(if not specified, empty or when the special value "binary” or '
+      r'“bytes” is used, the file is considered as a byte stream)')
+    a('-E', '--encoding-fallback', default=None,
+      help=r'file encoding if the -e encoding fails. '
+      r'Use the empty string or the argument of -e to avoid retrying.')
     a('-k', '--keep', action='store_true',
       help=r'try to keep timestamps when modifying files')
     a('-g', '--grep', action='store_true',
@@ -160,13 +163,21 @@ def write_repr_match(match):
 
 
 def write_printable(text):
-    write(write_printable.nonprintable.sub(write_repr_match, text))
-write_printable.nonprintable = re.compile('[\x00-\x09\x0B-\x1F]')
+    write(write_printable.re.sub(write_repr_match, text))
+write_printable.re = re.compile('[\x00-\x09\x0B-\x1F]')
 
 
 def write_repr(text):
-    write(write_repr.nonprintable.sub(write_repr_match, text))
-write_repr.nonprintable = re.compile('[\x00-\x1F]')
+    write(write_repr.re.sub(write_repr_match, text))
+write_repr.re = re.compile('[\x00-\x1F]')
+
+
+def write_printable_bytes(text):
+    write_printable(text.decode('utf-8', errors='backslashreplace'))
+
+
+def write_repr_bytes(text):
+    write_repr(text.decode('utf-8', errors='backslashreplace'))
 
 
 def eprint(*args, **kwargs):
@@ -184,16 +195,15 @@ def my_input(msg):
         return input(msg)
 
 
-def linestart(text, index):
-    if index <= 0:
-        return 0
-    previous = text.rfind('\n', 0, index)
-    if previous < 0:
-        return 0
-    return previous + 1
-
-
 class MatchList:
+    def _linestart(self, index):
+        if index <= 0:
+            return 0
+        previous = self.text.rfind(self._newline, 0, index)
+        if previous < 0:
+            return 0
+        return previous + 1
+
     def empty(self):
         return (not self._list)
 
@@ -211,8 +221,8 @@ class MatchList:
         self._pos = self._list[0][0]
         if self._chars:
             return
-        self._line_number = self.text.count('\n', 0, self._pos)
-        self._line_start = linestart(self.text, self._pos)
+        self._line_number = self.text.count(self._newline, 0, self._pos)
+        self._line_start = self._linestart(self._pos)
         self._line_printed = 0
 
     def add(self, start, end, replace=None):
@@ -238,7 +248,7 @@ class MatchList:
             c[2] = False
         npos = pos + l
         if not self._chars:
-            self._line_number += self.text.count('\n', pos, npos)
+            self._line_number += self.text.count(self._newline, pos, npos)
             self._line_printed = self._line_number + self.after + 1
         self._index += 1
         if not self.have():
@@ -246,8 +256,8 @@ class MatchList:
         pos = npos
         npos = pos + self._list[self._index][0]
         if not self._chars:
-            self._line_number += self.text.count('\n', pos, npos)
-            self._line_start = linestart(self.text, npos)
+            self._line_number += self.text.count(self._newline, pos, npos)
+            self._line_start = self._linestart(npos)
         self._pos = npos
         return True
 
@@ -320,7 +330,7 @@ class MatchList:
         for i in range(self.before):
             if start == 0 or line_number - len(starts) <= self._line_printed:
                 break
-            start = linestart(self.text, start - 1)
+            start = self._linestart(start - 1)
             starts.append(start)
         if not starts:
             return
@@ -336,7 +346,7 @@ class MatchList:
         self._write_substring(prevstart, self._line_start)
 
     def _output_to_lineend(self, current, pos, index, in_pattern):
-        newline = self.text.find('\n', current)
+        newline = self.text.find(self._newline, current)
         if newline < 0:
             newline = len(self.text)
             nextline = None
@@ -421,7 +431,7 @@ class MatchList:
             if line_number > self._line_number:
                 self._write_line_number(line_number, mode=mode)
             reset = self._write_color(replace=replace)
-            newline = output.find('\n', output_current)
+            newline = output.find(self._newline, output_current)
             if newline < 0:
                 self._write_printable(output[output_current:])
                 if reset:
@@ -486,10 +496,11 @@ class MatchList:
         if pos is None:
             return False
         self._line_printed = line_number
-        self._line_number = line_number + self.text.count('\n', current, pos)
+        self._line_number = line_number + \
+            self.text.count(self._newline, current, pos)
         self._index = index
         self._pos = pos
-        self._line_start = linestart(self.text, pos)
+        self._line_start = self._linestart(pos)
         return True
 
     def _output_chars(self, current, pos, index, in_pattern, finish):
@@ -633,14 +644,24 @@ class MatchList:
         self._chars = chars
         self._list = []
         self._previous = 0
+        if hasattr(text, 'encode'):  # python2: str, unicode or python3: str
+            self._newline = '\n'
+            if chars:
+                self._write_printable = write_repr
+            else:
+                self._write_printable = write_printable
+        else:
+            self._newline = b'\n'
+            if chars:
+                self._write_printable = write_repr_bytes
+            else:
+                self._write_printable = write_printable_bytes
         if chars:
-            self._write_printable = write_repr
             if grep:
                 self.output_next_grep = self._output_next_chars_grep
             else:
                 self.output_nogrep = self._output_chars_nogrep
         else:
-            self._write_printable = write_printable
             if grep:
                 self.output_next_grep = self._output_next_lines_grep
             else:
@@ -649,15 +670,18 @@ class MatchList:
 
 class Matcher:
     def __init__(self, search, replace=None, plain_search=False,
-                 plain_replace=False, flags=0, quiet=False):
+                 plain_replace=False, flags=0, quick=False):
         self._quick = False
         if plain_search:
-            search = re.sub(r'[a-zA-Z_]', r'\\\0', search)
+            if type(search) is str:
+                search = re.sub(r'[a-zA-Z_]', r'\\\0', search)
+            else:
+                search = re.sub(br'[a-zA-Z_]', br'\\\0', search)
         self._re = re.compile(search, flags)
         if replace is None:
             self._plain_replace = True
             self._replace = None
-            if quiet:
+            if quick:
                 self._quick = True
             return
         if plain_replace:
@@ -720,26 +744,36 @@ def close_noexcept(file):
         pass
 
 
+def normalize_encoding(encoding):
+    if encoding is None or not encoding or encoding == 'bytes':
+        return 'binary'
+    return encoding
+
+
 class Action:
-    def _slurp(self, filename, encoding_override=None):
-        self._encoding_override = encoding_override  # Remember for writing
-        if encoding_override:
-            encoding = encoding_override
+    def _slurp(self, filename, encoding=None):
+        if encoding is None:
+            self._encoding_current = self._encoding
         else:
-            encoding = self._encoding
+            self._encoding_current = encoding
         try:
-            file = codecs.open(filename, 'rb', encoding=encoding)
+            if self._encoding_current != 'binary':
+                file = io.open(filename, 'r', encoding=self._encoding_current,
+                               newline='\n')
+            else:
+                file = io.open(filename, 'rb')
+                self._matcher = self._matcher_byte
         except Exception as e:
             warn('cannot open {0} for reading: {1}'.format(filename, e))
             return None
         try:
             text = file.read()
         except UnicodeDecodeError as e:
-            if encoding_override:
+            close_noexcept(file)
+            if encoding_override is None:
                 warn('fallback encoding fails, too: {0}'.format(e))
                 return None
-            close_noexcept(file)
-            if self._encoding_fallback and self._encoding_fallback != encoding:
+            if self._encoding_fallback is not None:
                 warn('switching encoding {0}->{1} for {2}: {3}'.
                      format(self._encoding, self._encoding_fallback,
                             filename, e))
@@ -757,6 +791,10 @@ class Action:
             warn('error when closing {0} after reading: {1}'.
                  format(filename, e))
             return None
+        if type(text) is bytes:
+            self._matcher = self._matcher_byte
+        else:
+            self._matcher = self._matcher_unicode
         return text
 
     def _write(self, filename, text):
@@ -767,12 +805,12 @@ class Action:
             except Exception as e:
                 stat = None
                 warn('cannot get timestamp of {0}: {1}'.format(filename, e))
-        if self._encoding_override is not None:
-            encoding = self._encoding_override
-        else:
-            encoding = self._encoding
         try:
-            file = codecs.open(filename, 'wb', encoding=encoding)
+            if self._encoding_current != 'binary':
+                file = io.open(filename, 'w', encoding=self._encoding_current,
+                               newline='\n')
+            else:
+                file = io.open(filename, 'wb')
         except Exception as e:
             warn('cannot open {0} for writing: {1}'.format(filename, e))
             return
@@ -791,7 +829,7 @@ class Action:
                 warn('cannot set timestamp of {0}: {1}'.format(filename, e))
 
     def _exit(self):
-        if self._replace is None and not self._have:
+        if self._grep and not self._have:
             sys.exit(1)  # grep mode with no match
         sys.exit(0)
 
@@ -805,7 +843,7 @@ class Action:
         match_list.after = self._after
         match_list.filename = filename
         have = (not match_list.empty())
-        if self._replace is None:
+        if self._grep:
             if have:
                 self._have = True
                 if self._quiet:
@@ -883,14 +921,17 @@ class Action:
         self._debug = options.debug
         self._chars = options.chars
         files = options.files
+        search = options.search
+        replace = options.replace
         if options.grep or options.count or options.list:
+            self._grep = True
             if options.replace is not None:
                 files.insert(0, options.replace)
-            self._replace = options.replace = None
+            replace = None
             self._list = options.list
             self._count = options.count
         else:
-            self._replace = options.replace
+            self._grep = False
         if not files:
             self._parse_error('no files specified')
         self._colors = Colors(options.colors)
@@ -918,8 +959,13 @@ class Action:
             flags |= re.LOCALE
         if options.verbose:
             flags |= re.VERBOSE
-        self._encoding = options.encoding
-        self._encoding_fallback = options.encoding_fallback
+        self._encoding = normalize_encoding(options.encoding)
+        self._encoding_fallback = None
+        encoding_fallback = ''
+        if self._encoding != 'binary':
+            encoding_fallback = normalize_encoding(options.encoding_fallback)
+            if encoding_fallback != self._encoding:
+                self._encoding_fallback = encoding_fallback
         self._keep = options.keep
         self._quiet = options.quiet
         self._skip = options.skip
@@ -931,13 +977,41 @@ class Action:
             self._always_write = True
         else:
             self._always_write = False
-        self._matcher = Matcher(
-            options.search, self._replace,
-            plain_search=options.plain_search,
-            plain_replace=options.plain_replace,
-            flags=flags,
-            quiet=self._quiet,
-        )
+        search_byte = search_unicode = replace_byte = replace_unicode = None
+        if type(search) is bytes:  # only for python2
+            search_byte = search
+            replace_byte = replace
+            if self._encoding != 'binary':
+                search_unicode = search.decode('utf-8')
+                if replace is not None:
+                    replace_unicode = replace.decode('utf-8')
+        else:
+            search_unicode = search
+            replace_unicode = replace
+            if self._encoding == 'binary' or encoding_fallback == 'binary':
+                search_byte = search.encode('utf-8')
+                if replace is not None:
+                    replace_byte = replace.encode('utf-8')
+        if search_byte is not None:
+            self._matcher_byte = Matcher(
+                search_byte, replace_byte,
+                plain_search=options.plain_search,
+                plain_replace=options.plain_replace,
+                flags=flags,
+                quick=self._quiet,
+            )
+        if search_unicode is not None:
+            self._matcher_unicode = Matcher(
+                search_unicode, replace_unicode,
+                plain_search=options.plain_search,
+                plain_replace=options.plain_replace,
+                flags=flags,
+                quick=self._quiet,
+            )
+            if search_byte is None:
+                self._matcher_byte = self._matcher_unicode
+        else:
+            self._matcher_unicode = self._matcher_byte
         for filename in files:
             if self._test_skip(filename):
                 continue

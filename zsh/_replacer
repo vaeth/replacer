@@ -8,8 +8,8 @@ _arguments -s -S : \
 '(--before -B --after -A '{'--context)-C+','-C)--context='}'[print specified number of context lines]:number of context lines:(2)' \
 {'(--plain-search)-p','(-p)--plain-search'}'[use plain string for search]' \
 {'(--plain-replace)-P','(-P)--plain-replace'}'[use plain string for replace]' \
-{'(--encoding)-e+','(-e)--encoding='}'[use specified file encoding (utf8)]:file encoding:(cp850 cp1252)' \
-{'(--encoding-fallback)-E+','(-E)--encoding-fallback='}'[use specified fallback file encoding (cp1252)]:file encoding:(cp850)' \
+{'(--encoding)-e+','(-e)--encoding='}'[use specified file encoding (binary)]:file encoding:(binary utf-8 cp850 cp1252 latin-1)' \
+{'(--encoding-fallback)-E+','(-E)--encoding-fallback='}'[use specified fallback file encoding (binary)]:file encoding:(binary utf-8 cp850 cp1252 latin-1)' \
 {'(--keep)-k','(-k)--keep'}'[try to keep timestamps]' \
 '(2 --count -c --list -l '{'--grep)-g','-g)--grep'}'[grep mode]' \
 '(2 --grep -g --list -l '{'--count)-c','-c)--count'}'[grep mode, count]' \
