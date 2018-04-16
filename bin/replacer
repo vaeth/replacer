@@ -36,6 +36,8 @@ except ImportError:
         NORMAL = '\033[22m'
         RESET_ALL = '\033[0m'
 
+version = '2.1'
+
 
 class Colors:
     reset = Style.RESET_ALL
@@ -69,7 +71,7 @@ class Colors:
                 Fore.YELLOW + Style.BRIGHT,  # filename
             ]
         else:
-            raise ValueError('bad color mode "{0}”'.format(mode))
+            raise ValueError('bad color mode “{0}”'.format(mode))
 
     def __init__(self, mode='dark'):
         self.set_mode(mode)
@@ -88,15 +90,17 @@ def get_parser():
          r'For the replace string, see in particular the description of '
          r'the sub() function. In the terminology of the web pages, '
          r'the arguments (as passed by the shell) are treated as '
-         r'"raw” strings.')
+         r'“raw” strings.')
     p = argparse.ArgumentParser(description=d)
     a = p.add_argument
-    a('-V', '--version', action='version', version='%(prog)s 2.0')
+    global version
+    a('-V', '--version', action='version',
+      version='{0} {1}'.format('%(prog)s', version))
     a('-b', '--chars', action='store_true',
       help=r'chars (binary) mode: Treat chars instead of lines as units '
       r'when formatting visual output. Thus, --before and --after and '
       r'printed numbers refer to character numbers instead of line numbers. '
-      r'Newline characters are output visually as "\n”.')
+      r'Newline characters are output visually as “\n”.')
     a('-B', '--before', type=int, default=None,
       help=r'add lines of context before match')
     a('-A', '--after', type=int, default=None,
@@ -110,7 +114,7 @@ def get_parser():
     a('-e', '--encoding', default=None,
       help=r'file encoding, e.g. utf-8, cp1252, cp850, latin-1, see '
       r'https://docs.python.org/3/library/codecs.html#standard-encodings '
-      r'(if not specified, empty or when the special value "binary” or '
+      r'(if not specified, empty or when the special value “binary” or '
       r'“bytes” is used, the file is considered as a byte stream)')
     a('-E', '--encoding-fallback', default=None,
       help=r'file encoding if the -e encoding fails. '
@@ -740,6 +744,8 @@ def ask_write(filename):
 def close_noexcept(file):
     try:
         file.close()
+    except KeyboardInterrupt:
+        raise
     except Exception:
         pass
 
@@ -763,6 +769,8 @@ class Action:
             else:
                 file = io.open(filename, 'rb')
                 self._matcher = self._matcher_byte
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             warn('cannot open {0} for reading: {1}'.format(filename, e))
             return None
@@ -781,19 +789,31 @@ class Action:
             warn('{0} encoding error for {1}: {2}'.
                  format(self._encoding, filename, e))
             return None
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             close_noexcept(file)
             warn('error when reading {0}: {1}'.format(filename, e))
             return None
         try:
             file.close()
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             warn('error when closing {0} after reading: {1}'.
                  format(filename, e))
             return None
         if type(text) is bytes:
+            if self._matcher_byte is None:
+                self._matcher_byte = self._matcher_fabric(unicode=False)
+                if self._matcher_unicode is not None:
+                    self._matcher_fabric = None  # Free unneeded memory
             self._matcher = self._matcher_byte
         else:
+            if self._matcher_unicode is None:
+                self._matcher_unicode = self._matcher_fabric(unicode=True)
+                if self._matcher_byte is not None:
+                    self._matcher_fabric = None  # Free unneeded memory
             self._matcher = self._matcher_unicode
         return text
 
@@ -802,6 +822,8 @@ class Action:
         if self._keep:
             try:
                 stat = os.stat(filename)
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 stat = None
                 warn('cannot get timestamp of {0}: {1}'.format(filename, e))
@@ -811,20 +833,28 @@ class Action:
                                newline='\n')
             else:
                 file = io.open(filename, 'wb')
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             warn('cannot open {0} for writing: {1}'.format(filename, e))
             return
         try:
             file.write(text)
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             warn('write error to {0}: {1}'.format(filename, e))
         try:
             file.close()
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             warn('cannot close {0} after writing: {1}'.format(filename, e))
         if stat is not None:
             try:
                 os.utime(filename, (stat.st_atime, stat.st_mtime))
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 warn('cannot set timestamp of {0}: {1}'.format(filename, e))
 
@@ -977,41 +1007,50 @@ class Action:
             self._always_write = True
         else:
             self._always_write = False
-        search_byte = search_unicode = replace_byte = replace_unicode = None
-        if type(search) is bytes:  # only for python2
-            search_byte = search
-            replace_byte = replace
-            if self._encoding != 'binary':
+
+        # Now the main configuration: Generate appropriate matcher_fabric()
+        # which uses local variable settings as closures
+
+        self._matcher_byte = self._matcher_unicode = None
+        if type(search) is bytes:  # The python2 case
+
+            def search_replace_byte():
+                return (search, replace)
+
+            def search_replace_unicode():
                 search_unicode = search.decode('utf-8')
+                replace_unicode = None
                 if replace is not None:
                     replace_unicode = replace.decode('utf-8')
-        else:
-            search_unicode = search
-            replace_unicode = replace
-            if self._encoding == 'binary' or encoding_fallback == 'binary':
+                return (search_unicode, replace_unicode)
+        else:  # The python3 case
+
+            def search_replace_unicode():
+                return (search, replace)
+
+            def search_replace_byte():
                 search_byte = search.encode('utf-8')
+                replace_byte = None
                 if replace is not None:
                     replace_byte = replace.encode('utf-8')
-        if search_byte is not None:
-            self._matcher_byte = Matcher(
-                search_byte, replace_byte,
+                return (search_byte, replace_byte)
+
+        def matcher_fabric(unicode=False):
+            if unicode:
+                (search_coded, replace_coded) = search_replace_unicode()
+            else:
+                (search_coded, replace_coded) = search_replace_byte()
+            return Matcher(
+                search_coded, replace_coded,
                 plain_search=options.plain_search,
                 plain_replace=options.plain_replace,
                 flags=flags,
                 quick=self._quiet,
             )
-        if search_unicode is not None:
-            self._matcher_unicode = Matcher(
-                search_unicode, replace_unicode,
-                plain_search=options.plain_search,
-                plain_replace=options.plain_replace,
-                flags=flags,
-                quick=self._quiet,
-            )
-            if search_byte is None:
-                self._matcher_byte = self._matcher_unicode
-        else:
-            self._matcher_unicode = self._matcher_byte
+        self._matcher_fabric = matcher_fabric
+
+        # Process files
+
         for filename in files:
             if self._test_skip(filename):
                 continue
@@ -1038,7 +1077,7 @@ class Action:
         except Exception as e:
             if self._debug:
                 raise
-            eprint('{0}: {1}'.format(type(e).__name__, e))
+            eprint('error: {0}: {1}'.format(type(e).__name__, e))
             sys.exit(2)
 
 Action()

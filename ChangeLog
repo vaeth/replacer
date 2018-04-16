@@ -1,5 +1,13 @@
 # ChangeLog for replacer
 
+*replacer-2.1
+	Martin Väth <martin at mvath.de>:
+	- Postpone recoding of search/replace (and thus possible errors)
+	  and corresponding regular expression preprocessing until it is
+	  proven that recoding is really needed
+	- Fixes of quotation signs in messages
+	- More care with KeyboardException
+
 *replacer-2.0
 	Martin Väth <martin at mvath.de>:
 	- Support (and default to) -e binary

@@ -21,5 +21,12 @@ To install this script, just copy the content of bin/ into your `$PATH`.
 To get zsh completion, copy the content of zsh/ to your zsh's `$fpath`,
 perhaps `/usr/share/zsh/site-functions/`.
 
+The script executes just `python` and is tested with python2.7 and python3.6,
+but it should work with all flavors of python3 and probably also some older
+versions of python2. Some details on codings and regular expressions might
+depend on the python interpreter, so it might be advisable to specify
+a specific interpreter in front of the command line (if in doubt try the
+newest available) if things are not working the way you expect.
+
 For Gentoo, there is an ebuild in the `mv` repository
 (available by `app-select/eselect-repository` or `app-portage/layman`).
