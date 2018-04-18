@@ -28,5 +28,9 @@ depend on the python interpreter, so it might be advisable to specify
 a specific interpreter in front of the command line (if in doubt try the
 newest available) if things are not working the way you expect.
 
+Under windows, it might be necessary to either have the colorama package
+installed or to enable ANSI color emulation or to disable colors
+with --colors=none to get readable output.
+
 For Gentoo, there is an ebuild in the `mv` repository
 (available by `app-select/eselect-repository` or `app-portage/layman`).

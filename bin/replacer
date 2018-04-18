@@ -177,7 +177,12 @@ def get_parser():
       r'This option is accumulative')
     a('-H', '--colors', default='dark',
       choices=['none', 'dark', 'light', 'style'],
-      help=r'highlight mode')
+      help=r'Set highlight mode. Default is --colors=dark. '
+      r'There are choices appropriate for terminals with dark (default) or '
+      r'light background or using only style attributes like reverse '
+      r'or underline. The latter might not work on all terminals. '
+      r'Under windows, it might be necessary to have the colorama package or '
+      r'ANSI emulation installed unless --colors=none is used.')
     a('-y', '--yes', action='count', default=0,
       help=r'always replace (twice to always write)')
     a('-q', '--quiet', action='store_true',
