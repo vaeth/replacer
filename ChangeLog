@@ -1,5 +1,11 @@
 # ChangeLog for replacer
 
+*replacer-2.2
+	Martin Väth <martin at mvath.de>:
+	- Provide --colors style
+	- Slightly modify --colors dark
+	- For error output omit printing confusing python class
+
 *replacer-2.1
 	Martin Väth <martin at mvath.de>:
 	- Postpone recoding of search/replace (and thus possible errors)

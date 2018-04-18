@@ -22,7 +22,7 @@ _arguments -s -S : \
 {'(--verbose)-X','(-X)--verbose'}'[allow comments in pattern]' \
 {'(--recursive)-r','(-r)--recursive'}'[recurse if FILE is a directory]' \
 {'*-s+','*--skip='}'[skip paths matching specified pattern]:path pattern:("*/")' \
-{'(--colors)-H+','(-H)--colors='}'[use specified highlight mode]:highlight mode:(none dark light)' \
+{'(--colors)-H+','(-H)--colors='}'[use specified highlight mode]:highlight mode:(none dark light style)' \
 {'(--yes)-y','(-y)--yes'}'[always replace (twice to always write)]' \
 {'(--quiet)-q','(-q)--quiet'}'[do not print matches, quiet grep]' \
 {'(--debug)-D','(-D)--debug'}'[print traceback on errors]' \

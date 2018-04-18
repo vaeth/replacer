@@ -36,7 +36,24 @@ except ImportError:
         NORMAL = '\033[22m'
         RESET_ALL = '\033[0m'
 
-version = '2.1'
+version = '2.2'
+
+
+class Effect(Style):
+    if not hasattr(Style, 'ITALIC'):
+        ITALIC = '\033[3m'
+    if not hasattr(Style, 'UNDERLINE'):
+        UNDERLINE = '\033[4m'
+    if not hasattr(Style, 'BLINK'):
+        BLINK = '\033[5m'
+    if not hasattr(Style, 'REVERSE'):
+        REVERSE = '\033[7m'
+    if not hasattr(Style, 'INVISIBLE'):
+        INVISIBLE = '\033[8m'
+    if not hasattr(Style, 'STRIKETHROUGH'):
+        STRIKETHROUGH = '\033[9m'
+    if not hasattr(Style, 'RESET_ALL'):
+        RESET_ALL = 'RESET'
 
 
 class Colors:
@@ -49,16 +66,18 @@ class Colors:
                 None,  # before, replaced
                 None,  # at, unreplaced
                 None,  # at, replaced
-                None,  # after or grep
+                None,  # after
+                None,  # grep
                 None,  # filename
             ]
         if mode == 'dark':
             self._data = [
-                Fore.MAGENTA,  # before, unreplaced
+                Fore.MAGENTA + Style.BRIGHT,  # before, unreplaced
                 Fore.BLUE + Style.BRIGHT,  # before, replaced
                 Fore.RED + Style.BRIGHT,  # at, unreplaced
                 Fore.GREEN + Style.BRIGHT,  # at, replaced
-                Fore.YELLOW + Style.BRIGHT,  # after or grep
+                Fore.YELLOW + Style.BRIGHT,  # after
+                Fore.YELLOW + Style.BRIGHT,  # grep
                 Fore.MAGENTA + Style.BRIGHT,  # filename
             ]
         elif mode == 'light':
@@ -67,8 +86,19 @@ class Colors:
                 Fore.CYAN,  # before, replaced
                 Fore.RED + Style.BRIGHT,  # at, unreplaced
                 Fore.BLUE + Style.BRIGHT,  # at, replaced
-                Fore.MAGENTA + Style.BRIGHT,  # after or grep
+                Fore.MAGENTA + Style.BRIGHT,  # after
+                Fore.MAGENTA + Style.BRIGHT,  # grep
                 Fore.YELLOW + Style.BRIGHT,  # filename
+            ]
+        elif mode == 'style':
+            self._data = [
+                Effect.UNDERLINE,  # before, unreplaced
+                Effect.UNDERLINE,  # before, replaced
+                Effect.REVERSE,  # at, unreplaced
+                Effect.REVERSE,  # at, replaced
+                Effect.UNDERLINE,  # after
+                Effect.REVERSE,  # grep
+                None,  # filename
             ]
         else:
             raise ValueError('bad color mode “{0}”'.format(mode))
@@ -145,7 +175,8 @@ def get_parser():
     a('-s', '--skip', action='append', default=[],
       help=r'skip files/dirs whose paths match the specified unix pattern. '
       r'This option is accumulative')
-    a('-H', '--colors', choices=['none', 'dark', 'light'], default='dark',
+    a('-H', '--colors', default='dark',
+      choices=['none', 'dark', 'light', 'style'],
       help=r'highlight mode')
     a('-y', '--yes', action='count', default=0,
       help=r'always replace (twice to always write)')
@@ -290,7 +321,7 @@ class MatchList:
     def colored_filename(self, append=':'):
         if self.filename is None:
             return ''
-        color = self.colors[5]
+        color = self.colors[6]
         if color:
             return (color + self.filename + self.colors.reset + append)
         return (self.filename + append)
@@ -308,7 +339,7 @@ class MatchList:
 
     def _write_color(self, replace=None, index=None):
         if self._grep:
-            color = self.colors[4]
+            color = self.colors[5]
         elif index is None:
             color = self.colors[2 + replace]
         else:
@@ -1077,7 +1108,7 @@ class Action:
         except Exception as e:
             if self._debug:
                 raise
-            eprint('error: {0}: {1}'.format(type(e).__name__, e))
+            eprint('error: {0}'.format(e))
             sys.exit(2)
 
 Action()
