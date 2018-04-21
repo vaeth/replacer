@@ -11,15 +11,80 @@ import os
 import re
 import sys
 
+version = '3.0'
+
+# Set localedir to e.g. '/usr/share/locale' to fix the gettext (nls) path.
+# If localedir == '', the value is fetched from $REPLACER_NLS or $NLS.
+# If localedir is None, gettext (nls) is not used.
+localedir = ''
+
 try:
     import sre_parse
     have_sre_parse = True
 except ImportError:
     have_sre_parse = False
 
+if localedir is not None:
+    try:
+        import gettext
+    except ImportError:
+        localedir = None
+
 try:
     from colorama import Fore, Style
+    have_colorama = True
 except ImportError:
+    have_colorama = False
+
+
+have_gettext = False
+if localedir is not None:
+    if not localedir:  # Use $REPLACER_NLS as a fallback
+        localedir = os.environ['REPLACER_NLS']
+        if not localedir:  # Use $NLS as a fallback
+            localedir = os.environ['NLS']
+    try:
+        gettext.install('replacer', localedir=localedir, names=['ngettext'])
+        have_gettext = True
+    except OSError:
+        have_gettext = False
+
+if have_gettext:
+    def pgettext(id, message):
+        msgid = id + '\x04' + message
+        t = _(msgid)
+        if t == msgid:  # Lookup failed
+            return message
+        return t
+
+    def npgettext(id, msgid1, msgid2, n):
+        msgid = id + '\0x04' + msgid1
+        t = ngettext(msgid, msgid2, n)
+        if t == msgid:  # Lookup failed
+            if n == 1:
+                return msgid1
+            return msgid2
+        return t
+else:
+    def gettext(message):
+        return message
+    _ = gettext
+
+    def ngettext(msgid1, msgid2, n):
+        if n == 1:
+            return msgid1
+        return msgid2
+
+    def pgettext(id, message):
+        return gettext(message)
+
+    def npgettext(id, msgid1, msgid2, n):
+        return ngettext(msgid1, msgid2, n)
+N_ = ngettext
+P_ = pgettext
+NP_ = npgettext
+
+if not have_colorama:
     class Fore:
         BLACK = '\033[30m'
         RED = '\033[31m'
@@ -35,8 +100,6 @@ except ImportError:
         DIM = '\033[2m'
         NORMAL = '\033[22m'
         RESET_ALL = '\033[0m'
-
-version = '2.2'
 
 
 class Effect(Style):
@@ -111,86 +174,99 @@ class Colors:
 
 
 def get_parser():
-    d = (r'Interactively replace python regular expressions in files. '
-         r'The specified SEARCH and REPLACE expressions are a regular '
-         r'expression and replace string following the python syntax, '
-         r'see e.g. https://docs.python.org/3/library/re.html or '
-         r'https://docs.python.org/2/library/re.html (exact features '
-         r'depending on your python interpreter). '
-         r'For the replace string, see in particular the description of '
-         r'the sub() function. In the terminology of the web pages, '
-         r'the arguments (as passed by the shell) are treated as '
-         r'“raw” strings.')
+    d = _(r'Interactively replace python regular expressions in files. '
+          r'The specified SEARCH and REPLACE expressions are a regular '
+          r'expression and replace string following the python syntax, '
+          r'see e.g. https://docs.python.org/3/library/re.html or '
+          r'https://docs.python.org/2/library/re.html (exact features '
+          r'depending on your python interpreter). '
+          r'For the replace string, see in particular the description of '
+          r'the sub() function. In the terminology of the web pages, '
+          r'the arguments (as passed by the shell) are treated as '
+          r'“raw” strings.')
     p = argparse.ArgumentParser(description=d)
     a = p.add_argument
     global version
     a('-V', '--version', action='version',
       version='{0} {1}'.format('%(prog)s', version))
-    a('-b', '--chars', action='store_true',
-      help=r'chars (binary) mode: Treat chars instead of lines as units '
-      r'when formatting visual output. Thus, --before and --after and '
+    a('-b', '--chars', action='store_true', help=P_(
+      'help', r'chars (binary) mode: Treat chars instead of lines as units '
+      r'when formatting visual output. Thus, BEFORE, AFTER, CONTEXT, and '
       r'printed numbers refer to character numbers instead of line numbers. '
-      r'Newline characters are output visually as “\n”.')
-    a('-B', '--before', type=int, default=None,
-      help=r'add lines of context before match')
-    a('-A', '--after', type=int, default=None,
-      help=r'add lines of context after match')
-    a('-C', '--context', type=int, default=0,
-      help=r'add lines of context before and after match')
-    a('-p', '--plain-search', action='store_true',
-      help=r'treat search expression as plain string')
-    a('-P', '--plain-replace', action='store_true',
-      help=r'treat replace expression as plain string')
-    a('-e', '--encoding', default=None,
-      help=r'file encoding, e.g. utf-8, cp1252, cp850, latin-1, see '
+      r'Newline characters are output visually as “\n”.'))
+    a('-B', '--before', metavar=P_('help', 'BEFORE'),
+      type=int, default=None, help=P_(
+        'help', r'output lines of context before match'))
+    a('-A', '--after', metavar=P_('help', 'AFTER'),
+      type=int, default=None, help=P_(
+        'help', r'output lines of context after match'))
+    a('-C', '--context', metavar=P_('help', 'CONTEXT'),
+      type=int, default=0, help=P_(
+        'help', r'output lines of context before and after match'))
+    a('-p', '--plain-search', action='store_true', help=P_(
+      'help', r'treat search expression as plain string'))
+    a('-P', '--plain-replace', action='store_true', help=P_(
+      'help', r'treat replace expression as plain string'))
+    a('-e', '--encoding', metavar=P_('help', 'ENCODING'),
+      default=None, help=P_(
+      'help', r'file encoding, e.g. utf-8, cp1252, cp850, latin-1, see '
       r'https://docs.python.org/3/library/codecs.html#standard-encodings '
       r'(if not specified, empty or when the special value “binary” or '
-      r'“bytes” is used, the file is considered as a byte stream)')
-    a('-E', '--encoding-fallback', default=None,
-      help=r'file encoding if the -e encoding fails. '
-      r'Use the empty string or the argument of -e to avoid retrying.')
-    a('-k', '--keep', action='store_true',
-      help=r'try to keep timestamps when modifying files')
-    a('-g', '--grep', action='store_true',
-      help=r'grep mode, only show matches')
-    a('-c', '--count', action='store_true',
-      help=r'grep mode, count matches in files')
-    a('-l', '--list', action='store_true',
-      help=r'grep mode, list matches in files')
-    a('-I', '--ignorecase', action='store_true',
-      help=r'ignore case in search expression')
-    a('-M', '--multiline', action='store_true',
-      help=r'make ^ and $ in search expression consider each line')
-    a('-S', '--dotall', action='store_true',
-      help=r'make . in search expression match newline, too')
-    a('-U', '--unicode', action='store_true',
-      help=r'make \w \W \b \B in search expression follow unicode rules')
-    a('-L', '--locale', action='store_true',
-      help=r'make \w \W \b \B in search expression follow locale')
-    a('-X', '--verbose', action='store_true',
-      help=r'allow comments in search expression')
-    a('-r', '--recursive', action='store_true',
-      help=r'recurse if FILE is a directory. When recursing, non-files and '
-      r'symbolic links to directories are tacitly ignored.')
-    a('-s', '--skip', action='append', default=[],
-      help=r'skip files/dirs whose paths match the specified unix pattern. '
-      r'This option is accumulative')
+      r'“bytes” is used, the file is considered as a byte stream)'))
+    a('-E', '--encoding-fallback', metavar=P_('help', 'ENCODING'),
+      default=None, help=P_(
+      'help', r'file encoding if the -e encoding fails. '
+      r'Use the empty string or the argument of -e to avoid retrying.'))
+    a('-k', '--keep', action='store_true', help=P_(
+      'help', r'try to keep timestamps when modifying files'))
+    a('-g', '--grep', action='store_true', help=P_(
+      'help', r'grep mode, only show matches'))
+    a('-c', '--count', action='store_true', help=P_(
+      'help', r'grep mode, count matches in files'))
+    a('-l', '--list', action='store_true', help=P_(
+      'help', r'grep mode, list files with matches'))
+    a('-I', '--ignorecase', action='store_true', help=P_(
+      'help', r'ignore case in search expression'))
+    a('-M', '--multiline', action='store_true', help=P_(
+      'help', r'make ^ and $ in search expression consider each line'))
+    a('-S', '--dotall', action='store_true', help=P_(
+      'help', r'make . in search expression match newline, too'))
+    a('-U', '--unicode', action='store_true', help=P_(
+      'help', r'make \w \W \b \B in search expression follow unicode rules'))
+    a('-L', '--locale', action='store_true', help=P_(
+      'help', r'make \w \W \b \B in search expression follow locale'))
+    a('-X', '--verbose', action='store_true', help=P_(
+      'help', r'allow comments in search expression'))
+    a('-r', '--recursive', action='store_true', help=P_(
+      'help', r'recurse if FILE is a directory. When recursing, non-files and '
+      r'symbolic links to directories are tacitly ignored.'))
+    a('-s', '--skip', metavar=P_('help', 'PATTERN'),
+      action='append', default=[], help=P_(
+      'help', r'skip files/dirs whose paths match PATTERN. '
+      r'This option is accumulative'))
+    a('-R', '--require', metavar=P_('help', 'PATTERN'),
+      action='append', default=[], help=P_(
+      'help',  r'skip files/dirs whose paths do not match PATTERN. '
+      r'This option is accumulative'))
     a('-H', '--colors', default='dark',
-      choices=['none', 'dark', 'light', 'style'],
-      help=r'Set highlight mode. Default is --colors=dark. '
-      r'There are choices appropriate for terminals with dark (default) or '
-      r'light background or using only style attributes like reverse '
-      r'or underline. The latter might not work on all terminals. '
-      r'Under windows, it might be necessary to have the colorama package or '
-      r'ANSI emulation installed unless --colors=none is used.')
-    a('-y', '--yes', action='count', default=0,
-      help=r'always replace (twice to always write)')
-    a('-q', '--quiet', action='store_true',
-      help=r'do not print matches, quiet grep')
+      choices=['none', 'dark', 'light', 'style'], help=P_(
+        'help', r'set highlight mode. Default is --colors=dark. '
+        r'There are choices appropriate for terminals with dark (default) or '
+        r'light background or using only style attributes like reverse '
+        r'or underline. The latter might not work on all terminals. '
+        r'Under windows, it might be necessary to have the colorama package '
+        r'or ANSI emulation installed unless --colors=none is used.'))
+    a('-y', '--yes', action='count', default=0, help=P_(
+      'help', r'always replace (twice to always write)'))
+    a('-q', '--quiet', action='store_true', help=P_(
+      'help', r'do not print matches, quiet grep'))
     a('-D', '--debug', action='store_true')
-    a('search', metavar='SEARCH', help=r'search expression')
-    a('replace', metavar='REPLACE', help=r'replace string')
-    a('files', metavar='FILE', nargs='*', help=r'files to process')
+    a('search', metavar=P_('help', 'SEARCH'), help=P_(
+      'help', r'search expression'))
+    a('replace', metavar=P_('help', 'REPLACE'), help=P_(
+      'help', r'replace string'))
+    a('files', metavar=P_('help', 'FILE'), nargs='*', help=P_(
+      'help', r'files to process'))
     return p
 
 
@@ -756,25 +832,48 @@ class Matcher:
 
 
 def ask_replace():
-    msg = 'y(es)/n(o)/r(est of file)/q(uit this file)/a(lways)' \
-          '/A(lways quiet)/s(top all) '
+    msg = P_('replace', 'y(es)/n(o)/r(est of file)/q(uit this file)/a(lways)/'
+             'A(lways quiet)/s(top all) ')
     while True:
-        answer = my_input(msg)
-        if answer == 's':
-            sys.exit(0)
-        if answer in ['y', 'n', 'r', 'q', 'a', 'A']:
-            return answer
+        key = my_input(msg)
+        try:
+            answer = ask_replace.dictionary[key]
+            break
+        except KeyError:
+            continue
+    if answer == 's':
+        sys.exit(0)
+    return answer
+ask_replace.dictionary = {
+    P_('replace', 's'): 's',
+    P_('replace', 'y'): 'y',
+    P_('replace', 'n'): 'n',
+    P_('replace', 'r'): 'r',
+    P_('replace', 'q'): 'q',
+    P_('replace', 'a'): 'a',
+    P_('replace', 'A'): 'A',
+}
 
 
 def ask_write(filename):
-    msg = 'write changes to {0}? y(es)/n(o)/w(rite always)/s(top all) '. \
-        format(filename)
+    msg = P_('write', 'write changes to {0}? '
+             'y(es)/n(o)/w(rite always)/s(top all) '.format(filename))
     while True:
-        answer = my_input(msg)
-        if answer == 's':
-            sys.exit(0)
-        if answer in ['y', 'n', 'w']:
-            return answer
+        key = my_input(msg)
+        try:
+            answer = ask_write.dictionary[key]
+            break
+        except KeyError:
+            continue
+    if answer == 's':
+        sys.exit(0)
+    return answer
+ask_write.dictionary = {
+    P_('replace', 's'): 's',
+    P_('replace', 'y'): 'y',
+    P_('replace', 'n'): 'n',
+    P_('replace', 'w'): 'w',
+}
 
 
 def close_noexcept(file):
@@ -808,35 +907,35 @@ class Action:
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            warn('cannot open {0} for reading: {1}'.format(filename, e))
+            warn(_('cannot open {0} for reading: {1}').format(filename, e))
             return None
         try:
             text = file.read()
         except UnicodeDecodeError as e:
             close_noexcept(file)
             if encoding_override is None:
-                warn('fallback encoding fails, too: {0}'.format(e))
+                warn(_('fallback encoding fails, too: {0}').format(e))
                 return None
             if self._encoding_fallback is not None:
-                warn('switching encoding {0}->{1} for {2}: {3}'.
+                warn(_('switching encoding {0}->{1} for {2}: {3}').
                      format(self._encoding, self._encoding_fallback,
                             filename, e))
                 return self._slurp(filename, self._encoding_fallback)
-            warn('{0} encoding error for {1}: {2}'.
+            warn(_('{0} encoding error for {1}: {2}').
                  format(self._encoding, filename, e))
             return None
         except KeyboardInterrupt:
             raise
         except Exception as e:
             close_noexcept(file)
-            warn('error when reading {0}: {1}'.format(filename, e))
+            warn(_('error when reading {0}: {1}').format(filename, e))
             return None
         try:
             file.close()
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            warn('error when closing {0} after reading: {1}'.
+            warn(_('error when closing {0} after reading: {1}').
                  format(filename, e))
             return None
         if type(text) is bytes:
@@ -862,7 +961,7 @@ class Action:
                 raise
             except Exception as e:
                 stat = None
-                warn('cannot get timestamp of {0}: {1}'.format(filename, e))
+                warn(_('cannot get timestamp of {0}: {1}').format(filename, e))
         try:
             if self._encoding_current != 'binary':
                 file = io.open(filename, 'w', encoding=self._encoding_current,
@@ -872,27 +971,28 @@ class Action:
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            warn('cannot open {0} for writing: {1}'.format(filename, e))
+            warn(_('cannot open {0} for writing: {1}').format(filename, e))
             return
         try:
             file.write(text)
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            warn('write error to {0}: {1}'.format(filename, e))
+            warn(_('write error to {0}: {1}').format(filename, e))
         try:
             file.close()
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            warn('cannot close {0} after writing: {1}'.format(filename, e))
+            warn(_('error when closing {0} after writing: {1}').
+                 format(filename, e))
         if stat is not None:
             try:
                 os.utime(filename, (stat.st_atime, stat.st_mtime))
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                warn('cannot set timestamp of {0}: {1}'.format(filename, e))
+                warn(_('cannot set timestamp of {0}: {1}').format(filename, e))
 
     def _exit(self):
         if self._grep and not self._have:
@@ -965,7 +1065,12 @@ class Action:
         for skip in self._skip:
             if fnmatch.fnmatch(filename, skip):
                 return True
-        return False
+        if not self._require:
+            return False
+        for require in self._require:
+            if fnmatch.fnmatch(filename, require):
+                return False
+        return True
 
     def _recurse(self, dir):
         for (dirpath, dirnames, filenames) in os.walk(dir):
@@ -999,7 +1104,7 @@ class Action:
         else:
             self._grep = False
         if not files:
-            self._parse_error('no files specified')
+            self._parse_error(_('no files specified'))
         self._colors = Colors(options.colors)
         self._before = self._after = options.context
         if options.before is not None:
@@ -1008,10 +1113,10 @@ class Action:
             self._after = options.after
         if self._before < 0:
             self._parse_error(
-                '--before argument {0} is negative'.format(self._before))
+                _('--before argument {0} is negative').format(self._before))
         if self._after < 0:
             self._parse_error(
-                '--after argument {0} is negative'.format(self._after))
+                _('--after argument {0} is negative').format(self._after))
         flags = 0
         if options.ignorecase:
             flags |= re.IGNORECASE
@@ -1035,6 +1140,7 @@ class Action:
         self._keep = options.keep
         self._quiet = options.quiet
         self._skip = options.skip
+        self._require = options.require
         if options.yes:
             self._always_replace = True
         else:
@@ -1096,10 +1202,10 @@ class Action:
                 if options.recursive:
                     self._recurse(filename)
                 else:
-                    warn('forgotten --recursive: directory: {0}'.
+                    warn(_('forgotten --recursive: directory: {0}').
                          format(filename))
             else:
-                warn('not an accessible file: {0}'.format(filename))
+                warn(_('not an accessible file: {0}').format(filename))
 
     def __init__(self):
         self._debug = False
@@ -1113,7 +1219,7 @@ class Action:
         except Exception as e:
             if self._debug:
                 raise
-            eprint('error: {0}'.format(e))
+            eprint(_('error: {0}').format(e))
             sys.exit(2)
 
 Action()

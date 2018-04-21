@@ -21,6 +21,13 @@ To install this script, just copy the content of bin/ into your `$PATH`.
 To get zsh completion, copy the content of zsh/ to your zsh's `$fpath`,
 perhaps `/usr/share/zsh/site-functions/`.
 
+If you have gettext installed, you can also install translations:
+To install the translation catalogue use the command `po/install-mo ""`
+(omit the `""` to get help about the command).
+For testing, you can set REPLACER_NLS or NLS to the catalogue path.
+For installation, it is recommended to adapt the line
+localedir = '' in bin/replacer appropriately.
+
 The script executes just `python` and is tested with python2.7 and python3.6,
 but it should work with all flavors of python3 and probably also some older
 versions of python2. Some details on codings and regular expressions might

@@ -1,5 +1,11 @@
 # ChangeLog for replacer
 
+*replacer-3.0
+	Martin Väth <martin at mvath.de>:
+	- Support translations (gettext)
+	- Provide translation for de
+	- Support --require
+
 *replacer-2.2
 	Martin Väth <martin at mvath.de>:
 	- Provide --colors style

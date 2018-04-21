@@ -1,0 +1,392 @@
+# German translation for replacer.
+# This file is put in the public domain.
+# Automatically generated, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: replacer\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-04-21 19:33+0200\n"
+"PO-Revision-Date: 2018-04-21 19:36+0200\n"
+"Last-Translator: Martin Väth <martin at mvath.de>\n"
+"Language-Team: none\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#
+msgid ""
+"Interactively replace python regular expressions in files. The specified "
+"SEARCH and REPLACE expressions are a regular expression and replace string "
+"following the python syntax, see e.g. https://docs.python.org/3/library/re."
+"html or https://docs.python.org/2/library/re.html (exact features depending "
+"on your python interpreter). For the replace string, see in particular the "
+"description of the sub() function. In the terminology of the web pages, the "
+"arguments (as passed by the shell) are treated as “raw” strings."
+msgstr ""
+"Interaktive Ersetzung von regulären Python-Ausdrücken in Dateien. Die "
+"angegebenen Ausdrücke für SUCHE und ERSETZE sind ein regulärer Ausdruck bzw. "
+"Ersetzungstext gemäß Python-Syntax, siehe beispielsweise https://docs.python."
+"org/3/library/re.html oder https://docs.python.org/2/library/re.html "
+"(Details hängen vom benutzten Python-Interpreter aber). Näheres über den "
+"Ersetzungstext findet man insbesondere in der Beschreibung der Funktion "
+"sub(). In der Terminologie der Webseiten werden die Ausdrücke (so wie sie "
+"von der Shell übergeben werden) als „raw strings” interpretiert."
+
+#
+msgid ""
+"chars (binary) mode: Treat chars instead of lines as units when formatting "
+"visual output. Thus, BEFORE, AFTER, CONTEXT, and printed numbers refer to "
+"character numbers instead of line numbers. Newline characters are output "
+"visually as “\\n”."
+msgstr ""
+"Zeichenmodus/Binärmodus: Betrachte Zeichen statt Zeilen als Einheit bei der "
+"Formatierung der visuellen Ausgabe. Daher beziehen sich DAVOR, DANACH, "
+"KONTEXT und ausgegebene Zahlen auf Zeichenzahlen statt Zeilenzahlen. "
+"Zeilenvorschubzeichen werden visuell als „\\n“ ausgegeben."
+
+#
+msgctxt "help"
+msgid "BEFORE"
+msgstr "DAVOR"
+
+#
+msgctxt "help"
+msgid "output lines of context before match"
+msgstr "gibt Kontextzeilen vor dem Treffer aus"
+
+#
+msgctxt "help"
+msgid "AFTER"
+msgstr "DANACH"
+
+#
+msgctxt "help"
+msgid "output lines of context after match"
+msgstr "gibt Kontextzeilen nach dem Treffer aus"
+
+#
+msgctxt "help"
+msgid "CONTEXT"
+msgstr "KONTEXT"
+
+#
+msgctxt "help"
+msgid "output lines of context before and after match"
+msgstr "gibt Kontextzeilen vor und nach dem Treffer aus"
+
+#
+msgctxt "help"
+msgid "treat search expression as plain string"
+msgstr "behandelt Suchausdruck als blanke Zeichenkette"
+
+#
+msgctxt "help"
+msgid "treat replace expression as plain string"
+msgstr "behandelt Ersetzungstext als blanke Zeichenkette"
+
+#
+msgctxt "help"
+msgid "ENCODING"
+msgstr "KODIERUNG"
+
+#
+msgctxt "help"
+msgid ""
+"file encoding, e.g. utf-8, cp1252, cp850, latin-1, see https://docs.python."
+"org/3/library/codecs.html#standard-encodings (if not specified, empty or "
+"when the special value “binary” or “bytes” is used, the file is considered "
+"as a byte stream)"
+msgstr ""
+"Datei-Codierung, beispielsweise utf-8, cp1252, cp850, latin-1, siehe https://"
+"docs.python.org/3/library/codecs.html#standard-encodings (falls nicht "
+"engegeben, leer, oder für die speziellen Werte „binary“ und „bytes“ wird die "
+"Datei als unkodierter Bytestrom betrachtet)"
+
+#
+msgctxt "help"
+msgid ""
+"file encoding if the -e encoding fails. Use the empty string or the argument "
+"of -e to avoid retrying."
+msgstr ""
+"Datei-Kodierung, wenn die Kodierung mit -e fehlschlägt. Die leere "
+"Zeichenkette oder das gleiche Argument wie bei -e verhindern einen erneuten "
+"Versuch."
+
+#
+msgctxt "help"
+msgid "try to keep timestamps when modifying files"
+msgstr ""
+"es wird versucht, die Zeitstempel bei der Modifizierung von Files "
+"beizubehalten"
+
+#
+msgctxt "help"
+msgid "grep mode, only show matches"
+msgstr "grep-Modus; Treffer werden nur angezeigt"
+
+#
+msgctxt "help"
+msgid "grep mode, count matches in files"
+msgstr "grep-Modus; Treffer werden in Files gezählt"
+
+#
+msgctxt "help"
+msgid "grep mode, list files with matches"
+msgstr "grep-Modues; Files mit Treffern werden gelistet"
+
+#
+msgctxt "help"
+msgid "ignore case in search expression"
+msgstr "ignorieren der Groß-/Kleinschreibung im Suchausdruck"
+
+#
+msgctxt "help"
+msgid "make ^ and $ in search expression consider each line"
+msgstr "lässt ^ und $ im Suchausdruck Zeilen separat betrachten"
+
+#
+msgctxt "help"
+msgid "make . in search expression match newline, too"
+msgstr "lässt . im Suchausdruck auch Zeilenvorschubzeichen erkennen"
+
+#
+msgctxt "help"
+msgid "make \\w \\W \\b \\B in search expression follow unicode rules"
+msgstr "behandelt  \\w \\W \\b \\B im Suchausdruck nach Unicode-Regeln"
+
+#
+msgctxt "help"
+msgid "make \\w \\W \\b \\B in search expression follow locale"
+msgstr "behandelt  \\w \\W \\b \\B im Suchausdruck nach locale-Regeln"
+
+#
+msgctxt "help"
+msgid "allow comments in search expression"
+msgstr "erlaubt Kommentare im Suchausdruck"
+
+#
+msgctxt "help"
+msgid ""
+"recurse if FILE is a directory. When recursing, non-files and symbolic links "
+"to directories are tacitly ignored."
+msgstr ""
+"wenn DATEI ein Verzeichnis ist, wird dessen Inhalt rekursiv behandelt. Bei "
+"der Rekursion werden nicht-Dateien und symbolische Links auf Verzeichnisse "
+"stillschweigend ignoriert."
+
+#
+msgctxt "help"
+msgid "PATTERN"
+msgstr "MUSTER"
+
+#
+msgctxt "help"
+msgid "skip files/dirs whose paths match PATTERN. This option is accumulative"
+msgstr ""
+"Übergeht Dateien/Verzeichnisse, deren Pfad MUSTER entspricht. "
+"Diese Option kann mehrmals angegeben werden."
+
+#
+msgctxt "help"
+msgid ""
+"skip files/dirs whose paths do not match PATTERN. This option is accumulative"
+msgstr ""
+"Übergeht Dateien/Verzeichnisse, deren Pfad nicht MUSTER entspricht. "
+"Diese Option kann mehrmals angegeben werden."
+
+#
+msgctxt "help"
+msgid ""
+"set highlight mode. Default is --colors=dark. There are choices appropriate "
+"for terminals with dark (default) or light background or using only style "
+"attributes like reverse or underline. The latter might not work on all "
+"terminals. Under windows, it might be necessary to have the colorama package "
+"or ANSI emulation installed unless --colors=none is used."
+msgstr ""
+"legt den Farbmodus fest. Voreinstellung ist --colors=dark. Es gibt die Wahl "
+"zwischen Terminals mit dunklem („dark“ als Voreinstellung) und hellem "
+"(„light”) Hintergrund oder die Benutzung von Auszeichnungen („style”) wie "
+"Zeicheninversion oder Unterstreichung. Letzteres geht vielleicht nicht auf "
+"allen Terminals. Unter Windows kann es notwendig sein, dass colorama-Paket "
+"oder ANSI-Emulation zu installieren, außer wenn --colors=none benutzt wird."
+
+#
+msgctxt "help"
+msgid "always replace (twice to always write)"
+msgstr "immer ersetzen (zweimal, um auch immer zu schreiben)"
+
+#
+msgctxt "help"
+msgid "do not print matches, quiet grep"
+msgstr "keine Ausgabe der Treffer, grep ohne Ausgabe"
+
+#
+msgctxt "help"
+msgid "SEARCH"
+msgstr "SUCHE"
+
+#
+msgctxt "help"
+msgid "search expression"
+msgstr "Suchausdruck"
+
+#
+msgctxt "help"
+msgid "REPLACE"
+msgstr "ERSETZE"
+
+#
+msgctxt "help"
+msgid "replace string"
+msgstr "Ersetzungstext"
+
+#
+msgctxt "help"
+msgid "FILE"
+msgstr "DATEI"
+
+#
+msgctxt "help"
+msgid "files to process"
+msgstr "zu behandelnde Dateien"
+
+#
+msgctxt "replace"
+msgid ""
+"y(es)/n(o)/r(est of file)/q(uit this file)/a(lways)/A(lways quiet)/s(top "
+"all) "
+msgstr ""
+"j(a)/n(ein)/r(est der Datei)/e(nde der Datei)/i(immer)/I(immer still)/s(top) "
+
+#
+msgctxt "replace"
+msgid "s"
+msgstr "s"
+
+#
+msgctxt "replace"
+msgid "y"
+msgstr "j"
+
+#
+msgctxt "replace"
+msgid "n"
+msgstr "n"
+
+#
+msgctxt "replace"
+msgid "r"
+msgstr "r"
+
+#
+msgctxt "replace"
+msgid "q"
+msgstr "a"
+
+#
+msgctxt "replace"
+msgid "a"
+msgstr "i"
+
+#
+msgctxt "replace"
+msgid "A"
+msgstr "I"
+
+#
+#, python-brace-format
+msgctxt "write"
+msgid "write changes to {0}? y(es)/n(o)/w(rite always)/s(top all) "
+msgstr "Änderungen nach {0} schreiben? j(a)/n(ein)/d(ateien immer)/s(top)"
+
+#
+msgctxt "replace"
+msgid "w"
+msgstr "d"
+
+#
+#, python-brace-format
+msgid "cannot open {0} for reading: {1}"
+msgstr "kann {0} nicht zum Lesen öffnen: {1}"
+
+#
+#, python-brace-format
+msgid "fallback encoding fails, too: {0}"
+msgstr "Rückfall-Kodierung schlägt ebenfalls fehl: {0}"
+
+#
+#, python-brace-format
+msgid "switching encoding {0}->{1} for {2}: {3}"
+msgstr "Wechsel der Kodierung {0}->{1} für {2}: {3}"
+
+#
+#, python-brace-format
+msgid "{0} encoding error for {1}: {2}"
+msgstr "Fehler in {0}-Kodierung für {1}: {2}"
+
+#
+#, python-brace-format
+msgid "error when reading {0}: {1}"
+msgstr "Fehler beim Lesen von {0}: {1}"
+
+#
+#, python-brace-format
+msgid "error when closing {0} after reading: {1}"
+msgstr "Fehler beim Schließen von {0} nach Lesen: {1}"
+
+#
+#, python-brace-format
+msgid "cannot get timestamp of {0}: {1}"
+msgstr "Zeitstempel von {0} nicht lesbar: {1}"
+
+#
+#, python-brace-format
+msgid "cannot open {0} for writing: {1}"
+msgstr "Fehler beim Öffnen von {0} zum Schreiben: {1}"
+
+#
+#, python-brace-format
+msgid "write error to {0}: {1}"
+msgstr "Schreibfehler auf {0}: {1}"
+
+#
+#, python-brace-format
+msgid "error when closing {0} after writing: {1}"
+msgstr "Fehler beim Schließen von {0} nach Schreiben: {1}"
+
+#
+#, python-brace-format
+msgid "cannot set timestamp of {0}: {1}"
+msgstr "Fehler beim Setzen des Zeitstempels von {0}: {1}"
+
+#
+msgid "no files specified"
+msgstr "Keine Files angegeben"
+
+#
+#, python-brace-format
+msgid "--before argument {0} is negative"
+msgstr "--before hat negatives Argument {0}"
+
+#
+#, python-brace-format
+msgid "--after argument {0} is negative"
+msgstr "--after hat negatives Argument {0}"
+
+#
+#, python-brace-format
+msgid "forgotten --recursive: directory: {0}"
+msgstr "vergessenes --recursive: Datei ist Verzeichnis: {0}"
+
+#
+#, python-brace-format
+msgid "not an accessible file: {0}"
+msgstr "keine zugreifbare Datei: {0}"
+
+#
+#, python-brace-format
+msgid "error: {0}"
+msgstr "Fehler: {0}"

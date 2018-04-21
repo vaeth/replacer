@@ -21,6 +21,7 @@ _arguments -s -S : \
 {'(--locale)-L','(-K)--locale'}'[make \\w \\W \\b \\B follow locale]' \
 {'(--verbose)-X','(-X)--verbose'}'[allow comments in pattern]' \
 {'(--recursive)-r','(-r)--recursive'}'[recurse if FILE is a directory]' \
+{'*-R+','*--require='}'[require that paths match specified pattern]:path pattern:("*.")' \
 {'*-s+','*--skip='}'[skip paths matching specified pattern]:path pattern:("*/")' \
 {'(--colors)-H+','(-H)--colors='}'[use specified highlight mode]:highlight mode:((none\:"no coloring" dark\:"Use colors appropriate for dark background" light\:"Use colors appropriate for light background" style\:"Use style attributes instead of colors"))' \
 {'(--yes)-y','(-y)--yes'}'[always replace (twice to always write)]' \

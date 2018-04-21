@@ -1,0 +1,43 @@
+#!/bin/sh
+set -u
+project=replacer
+Echo() {
+	printf '%s\n' "$*"
+}
+Fatal() {
+	Echo "$*" >&2
+	exit 2
+}
+destdir_default=/usr/share/locale
+Usage() {
+	Echo "Usage: ${0##*/} DESTDIR
+Generates and installs .mo files into DESTDIR.
+
+Set LINGUAS to a space-separated list of languages if you want to install
+only a subset of languages.
+
+If DESTDIR is empty, the default is \$REPLACER_NLS or \$NLS or $destdir_default"
+	exit ${1:-1}
+}
+[ $# -ge 1 ] || Usage
+destdir=${1:-${REPLACER_NLS-}}
+: ${destdir:=${NLS-}}
+: ${destdir:=$destdir_default}
+sourcedir=${0%/*}
+[ -n "${sourcedir}" ] && test -d "$sourcedir" || sourcedir=.
+linguasfile=$sourcedir/LINGUAS
+test -r "$linguasfile" || Fatal "not readable $linguasfile"
+umask 022
+for lang in `grep -o '^[^#]*' -- "$linguasfile"`
+do	source=$sourcedir/$lang.po
+	test -f "$source" || Fatal "not file $source"
+	case " ${LINGUAS-*} " in
+	*" $lang "*|*' * ')
+		dest=$destdir/$lang/LC_MESSAGES
+		test -d "$dest" || install -d "$dest" || \
+			Fatal "failed to generate directory $dir"
+		output=$dest/$project.mo
+		msgfmt -c -f -v -v -o "$output" -- "$source" || \
+			Fatal "failed to generate $output"
+	esac
+done

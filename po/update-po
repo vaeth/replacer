@@ -1,0 +1,72 @@
+#!/bin/sh
+set -u
+Usage() {
+	echo "usage: ${0##*/} wrap|nowrap
+Updates po/*.po files"
+	exit ${1:-1}
+}
+case ${1-} in
+wrap)
+	nowrap=;;
+nowrap)
+	nowrap=--no-wrap;;
+*)
+	Usage;;
+esac
+
+package=replacer
+test -f "bin/$package" && test -f po/update-po || cd ..
+test -f "bin/$package" && test -f po/update-po || {
+	echo 'Current directory does not seem to be correct' >&2
+	exit 1
+}
+version=
+#version=`sed -ne 's/^version.*=[^0-9a-z]*\([0-9.a-z_]*\).*/\1/p' bin/replacer` || version=
+package_version=
+[ -z "$version" ] || package_version=--package-version=$version
+tmpfile=
+status=0
+trap 'trap : EXIT HUP INT TERM
+[ -z "$tmpfile" ] || ! test -f "$tmpfile" || rm -- "$tmpfile"
+tmpfile=
+trap - EXIT HUP INT TERM
+exit $status' EXIT HUP INT TERM
+tmpfile=`mktemp ${TMPDIR:-/tmp}/update.XXXXXXXX`
+nowrap=
+echo 'Calling gettext to generate temporary .pot'
+xgettext \
+	'--keyword=_' \
+	'--keyword=N_:1,2' \
+	'--keyword=P_:1c,2' \
+	'--keyword=NP_:1c,2,3' \
+	'--keyword=ngettext:1,2' \
+	'--keyword=pgettext:1c,2' \
+	'--keyword=npgettext:1c,2,3' \
+	'--no-location' \
+	$nowrap \
+	'--check=space-ellipsis' \
+	'--foreign-user' \
+	'--files-from=po/POTFILES' \
+	'--strict' \
+	'--language=Python' \
+	"--package-name=$package" \
+	$package_version \
+	"--output=$tmpfile"
+for lang in `grep -o '^[^#]*' po/LINGUAS`
+do	output=po/$lang.po
+	if test -f "$output"
+	then	printf '%s' "Updating $output"
+		msgmerge '--update' \
+			$nowrap \
+			-- "$output" "$tmpfile" || status=$?
+	else	echo "Generating $output"
+		msginit "--input=$tmpfile" "--output=$output" \
+			'--no-translator' \
+			$nowrap \
+			|| {
+				status=$?
+				echo 'msginit failed. Falling back to cp' >&2
+				cp -- "$tmpfile" "$output"
+			}
+	fi
+done
