@@ -1,5 +1,11 @@
 # ChangeLog for replacer
 
+*replacer-3.1
+	Martin Väth <martin at mvath.de>:
+	- Fix error if REPLACER_NLS or NLS are not set
+	- Fix error if gettext is found but gettext.install throws
+	- Fix translation of query for writing
+
 *replacer-3.0
 	Martin Väth <martin at mvath.de>:
 	- Support translations (gettext)

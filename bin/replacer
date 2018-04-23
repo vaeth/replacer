@@ -11,7 +11,7 @@ import os
 import re
 import sys
 
-version = '3.0'
+version = '3.1'
 
 # Set localedir to e.g. '/usr/share/locale' to fix the gettext (nls) path.
 # If localedir == '', the value is fetched from $REPLACER_NLS or $NLS.
@@ -40,9 +40,9 @@ except ImportError:
 have_gettext = False
 if localedir is not None:
     if not localedir:  # Use $REPLACER_NLS as a fallback
-        localedir = os.environ['REPLACER_NLS']
+        localedir = os.environ.get('REPLACER_NLS')
         if not localedir:  # Use $NLS as a fallback
-            localedir = os.environ['NLS']
+            localedir = os.environ.get('NLS')
     try:
         gettext.install('replacer', localedir=localedir, names=['ngettext'])
         have_gettext = True
@@ -66,9 +66,8 @@ if have_gettext:
             return msgid2
         return t
 else:
-    def gettext(message):
+    def _(message):
         return message
-    _ = gettext
 
     def ngettext(msgid1, msgid2, n):
         if n == 1:
@@ -76,7 +75,7 @@ else:
         return msgid2
 
     def pgettext(id, message):
-        return gettext(message)
+        return _(message)
 
     def npgettext(id, msgid1, msgid2, n):
         return ngettext(msgid1, msgid2, n)
@@ -832,10 +831,8 @@ class Matcher:
 
 
 def ask_replace():
-    msg = P_('replace', 'y(es)/n(o)/r(est of file)/q(uit this file)/a(lways)/'
-             'A(lways quiet)/s(top all) ')
     while True:
-        key = my_input(msg)
+        key = my_input(ask_replace.msg)
         try:
             answer = ask_replace.dictionary[key]
             break
@@ -844,6 +841,9 @@ def ask_replace():
     if answer == 's':
         sys.exit(0)
     return answer
+ask_replace.msg = P_(
+    'replace', 'y(es)/n(o)/r(est of file)/q(uit this file)/a(lways)/'
+    'A(lways quiet)/s(top all) ')
 ask_replace.dictionary = {
     P_('replace', 's'): 's',
     P_('replace', 'y'): 'y',
@@ -856,8 +856,7 @@ ask_replace.dictionary = {
 
 
 def ask_write(filename):
-    msg = P_('write', 'write changes to {0}? '
-             'y(es)/n(o)/w(rite always)/s(top all) '.format(filename))
+    msg = ask_write.msg.format(filename)
     while True:
         key = my_input(msg)
         try:
@@ -868,6 +867,9 @@ def ask_write(filename):
     if answer == 's':
         sys.exit(0)
     return answer
+ask_write.msg = P_(
+    'write', 'write changes to {0}? '
+    'y(es)/n(o)/w(rite always)/s(top all) ')
 ask_write.dictionary = {
     P_('replace', 's'): 's',
     P_('replace', 'y'): 'y',
