@@ -1,4 +1,6 @@
 #compdef replacer
+# (C) Martin V\"ath <martin at mvath.de>
+# SPDX-License-Identifier: MIT
 _arguments -s -S : \
 '(1 2 * -)'{'--help','-h'}'[print help]' \
 '(1 2 * -)'{'--version','-V'}'[print version]' \

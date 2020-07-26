@@ -1,4 +1,6 @@
 #!/bin/sh
+# (C) Martin V\"ath <martin at mvath.de>
+# SPDX-License-Identifier: MIT
 set -u
 Usage() {
 	echo "usage: ${0##*/} wrap|nowrap

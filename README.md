@@ -4,6 +4,7 @@ Search and replace python regular expressions within many files interactively
 
 (C) Martin Väth (martin at mvath.de).
 This project is under the MIT license
+SPDX-License-Identifier: MIT
 
 The aim of the project is to replace regular expressions interactively
 in a collection of files.

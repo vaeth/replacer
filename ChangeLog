@@ -1,5 +1,9 @@
 # ChangeLog for replacer
 
+*replacer-3.2
+	Martin Väth <martin at mvath.de>:
+	- Add SPDX-License-Identifier
+
 *replacer-3.1
 	Martin Väth <martin at mvath.de>:
 	- Fix error if REPLACER_NLS or NLS are not set
