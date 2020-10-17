@@ -12,7 +12,7 @@ import os
 import re
 import sys
 
-version = '3.2'
+version = '3.3'
 
 # Set localedir to e.g. '/usr/share/locale' to fix the gettext (nls) path.
 # If localedir == '', the value is fetched from $REPLACER_NLS or $NLS.
@@ -102,20 +102,34 @@ if not have_colorama:
         RESET_ALL = '\033[0m'
 
 
-class Effect(Style):
-    if not hasattr(Style, 'ITALIC'):
+class Effect:
+    if hasattr(Style, 'ITALIC'):
+        ITALIC = Style.ITALIC
+    else:
         ITALIC = '\033[3m'
-    if not hasattr(Style, 'UNDERLINE'):
+    if hasattr(Style, 'UNDERLINE'):
+        ITALIC = Style.UNDERLINE
+    else:
         UNDERLINE = '\033[4m'
-    if not hasattr(Style, 'BLINK'):
+    if hasattr(Style, 'BLINK'):
+        BLINK = Style.BLINK
+    else:
         BLINK = '\033[5m'
-    if not hasattr(Style, 'REVERSE'):
+    if hasattr(Style, 'REVERSE'):
+        REVERSE = Style.REVERSE
+    else:
         REVERSE = '\033[7m'
-    if not hasattr(Style, 'INVISIBLE'):
+    if hasattr(Style, 'INVISIBLE'):
+        INVISIBLE = Style.INVISIBLE
+    else:
         INVISIBLE = '\033[8m'
-    if not hasattr(Style, 'STRIKETHROUGH'):
+    if hasattr(Style, 'STRIKETHROUGH'):
+        STRIKETHROUGH = Style.STRIKETHROUGH
+    else:
         STRIKETHROUGH = '\033[9m'
-    if not hasattr(Style, 'RESET_ALL'):
+    if hasattr(Style, 'RESET_ALL'):
+        RESET_ALL = Style.RESET_ALL
+    else:
         RESET_ALL = 'RESET'
 
 

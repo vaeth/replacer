@@ -1,5 +1,10 @@
 # ChangeLog for replacer
 
+*replacer-3.3
+	Martin Väth <martin at mvath.de>:
+	- Make replacer work with current versions of colorama.
+	  Thanks to Helmut Jarausch for reporting the breakage.
+
 *replacer-3.2
 	Martin Väth <martin at mvath.de>:
 	- Add SPDX-License-Identifier
