@@ -1,5 +1,10 @@
 # ChangeLog for replacer
 
+*replacer-3.4
+	Martin Väth <martin at mvath.de>:
+	- Deal better with sre_parse deprecation:
+	  Suppress warning and check if sre_parse.expand_template exists.
+
 *replacer-3.3
 	Martin Väth <martin at mvath.de>:
 	- Make replacer work with current versions of colorama.

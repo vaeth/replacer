@@ -11,19 +11,23 @@ import locale
 import os
 import re
 import sys
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-version = '3.3'
+version = '3.4'
 
 # Set localedir to e.g. '/usr/share/locale' to fix the gettext (nls) path.
 # If localedir == '', the value is fetched from $REPLACER_NLS or $NLS.
 # If localedir is None, gettext (nls) is not used.
 localedir = ''
 
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 try:
     import sre_parse
-    have_sre_parse = True
+    have_sre_parse = "expand_template" in dir(sre_parse)
 except ImportError:
     have_sre_parse = False
+warnings.resetwarnings()
 
 if localedir is not None:
     try:
